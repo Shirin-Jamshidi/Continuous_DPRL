@@ -199,7 +199,7 @@ import matplotlib.pyplot as plt
 # --- Hyperparameters ---
 NUM_BUCKETS = (10, 10, 20, 20)
 NUM_ACTIONS = 31
-NUM_EPISODES = 30000
+NUM_EPISODES = 3000
 MAX_STEPS = 500
 
 MIN_EXPLORE_RATE = 0.01
