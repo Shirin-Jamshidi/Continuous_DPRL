@@ -175,7 +175,7 @@ import matplotlib.pyplot as plt
 # ============================================================
 # ✅ Hyperparameters
 # ============================================================
-NUM_EPISODES = 30000
+NUM_EPISODES = 3000
 MAX_STEPS = 500
 GAMMA = 0.99
 LR = 1e-3
