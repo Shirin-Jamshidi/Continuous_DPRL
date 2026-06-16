@@ -311,7 +311,6 @@ for episode in range(NUM_DEMO_EPISODES):
         # ✅ Store transition
         states.append(obs)
         actions.append(action_cont)  # shape (1,)
-        actions = np.array(actions, dtype=np.float32).reshape(-1, 1)
         rewards.append(reward)
         next_states.append(next_obs)
         dones.append(done)
@@ -328,7 +327,7 @@ for episode in range(NUM_DEMO_EPISODES):
 # ✅ SAVE DATASET
 # ============================================================
 states = np.array(states, dtype=np.float32)
-actions = np.array(actions, dtype=np.float32)   # (N,1) ✅ critical
+actions = np.array(actions, dtype=np.float32).reshape(-1, 1)  
 rewards = np.array(rewards, dtype=np.float32)
 next_states = np.array(next_states, dtype=np.float32)
 dones = np.array(dones, dtype=np.bool_)
