@@ -502,7 +502,7 @@ def build_config() -> argparse.Namespace:
     p.add_argument("--time_emb_dim",      type=int,   default=16)
 
     # Training
-    p.add_argument("--train_steps",  type=int,   default=20_000,
+    p.add_argument("--train_steps",  type=int,   default=100_000,
                    help="Gradient steps on demo data")
     p.add_argument("--batch_size",   type=int,   default=256)
     p.add_argument("--lr",           type=float, default=3e-4)
