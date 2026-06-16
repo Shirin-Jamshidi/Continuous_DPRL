@@ -193,6 +193,7 @@ class OfflineBuffer:
 
         states     = torch.tensor(raw["states"],      dtype=torch.float32)
         # actions_d  = torch.tensor(raw["actions"],     dtype=torch.float32)  # 0 or 1
+        actions = torch.tensor(raw["actions"], dtype=torch.float32)
         rewards    = torch.tensor(raw["rewards"],     dtype=torch.float32)
         next_states= torch.tensor(raw["next_states"], dtype=torch.float32)
 
@@ -200,7 +201,7 @@ class OfflineBuffer:
         # actions_c = (actions_d * 2.0 - 1.0) * force_mag   # (N,)
         # actions_c = actions_c.unsqueeze(-1)                 # (N, 1)
 
-        actions = torch.tensor(raw["actions"], dtype=torch.float32)
+
 
         # ✅ ensure shape is (N,1)
         if actions.dim() == 1:
@@ -213,6 +214,7 @@ class OfflineBuffer:
         dones = torch.zeros(len(states), dtype=torch.float32)
 
         self.states      = states.to(device)
+        # self.actions     = actions_c.to(device)
         self.actions     = actions.to(device)
         self.rewards     = rewards.to(device)
         self.next_states = next_states.to(device)
