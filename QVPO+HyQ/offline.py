@@ -310,7 +310,8 @@ for episode in range(NUM_DEMO_EPISODES):
 
         # ✅ Store transition
         states.append(obs)
-        actions.append([action_cont])  # shape (1,)
+        actions.append(action_cont)  # shape (1,)
+        actions = np.array(actions, dtype=np.float32).reshape(-1, 1)
         rewards.append(reward)
         next_states.append(next_obs)
         dones.append(done)
