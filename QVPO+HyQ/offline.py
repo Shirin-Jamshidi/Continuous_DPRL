@@ -343,7 +343,7 @@ np.savez("cartpole_demo_data.npz",
          dones=dones
          )
 
-print("\nSaved dataset as cartpole_tabular_data.npz")
+print("\nSaved dataset as cartpole_demo_data.npz")
 print("Dataset size:", len(states))
 
 # =======================

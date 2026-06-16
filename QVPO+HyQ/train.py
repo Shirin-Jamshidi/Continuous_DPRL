@@ -1837,7 +1837,7 @@ def build_config() -> argparse.Namespace:
     p.add_argument("--seed",        type=int,   default=42)
 
     # Demo data
-    p.add_argument("--demo_path",   default="cartpole_tabular_data.npz")
+    p.add_argument("--demo_path",   default="cartpole_demo_data.npz")
 
     # Diffusion model
     p.add_argument("--n_diffusion_steps", type=int,   default=5,
