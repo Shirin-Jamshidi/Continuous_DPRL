@@ -51,6 +51,7 @@ import math
 import random
 import argparse
 from typing import Optional, Tuple
+from metrics import MetricsTracker
 
 import numpy as np
 import torch
@@ -444,8 +445,7 @@ class VanillaDiffusionPolicy:
                     step=step,
                     returns=returns
                 )
-
-
+            tracker.save("vanilla_diffusion_metrics.npz") 
         print("\n  Training complete.\n")
 
     # ── Action selection — single DDPM sample, no selection tricks ────────
