@@ -820,6 +820,7 @@ class DiffusionQLTrainer:
 
             self.log["critic_loss"].append(c_loss)
             self.log["policy_loss"].append(p_loss)
+            tracker.save("qvpo+hy-q_metrics.npz")
 
         print("  Online finetuning done.\n")
 
