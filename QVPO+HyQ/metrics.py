@@ -297,9 +297,9 @@ def _iqm(arr: np.ndarray) -> float:
     return float(arr[mask].mean()) if mask.any() else float(arr.mean())
 
 
-
-print_comparison_table([
-    "vanilla_diffusion_metrics.npz",
-    "qvpo+hy-q_metrics.npz",
-    "qvpo_metrics.npz",
-])
+if __name__ == "__main__":
+    print_comparison_table([
+        "vanilla_diffusion_metrics.npz",
+        "qvpo+hy-q_metrics.npz",
+        "qvpo_metrics.npz",
+    ])

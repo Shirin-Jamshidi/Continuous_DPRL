@@ -446,7 +446,7 @@ class VanillaDiffusionPolicy:
                 #     step=step,
                 #     returns=returns
                 # )
-                
+
             if step % cfg.eval_interval == 0:
                 returns = []
 
@@ -549,6 +549,7 @@ def build_config() -> argparse.Namespace:
     # Evaluation
     p.add_argument("--eval_episodes", type=int, default=20)
     p.add_argument("--save_path",     default="checkpoints/vanilla_diffusion.pt")
+    p.add_argument("--eval_interval", type=int, default=1000)
 
     return p.parse_args()
 
