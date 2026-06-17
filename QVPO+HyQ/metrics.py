@@ -295,3 +295,11 @@ def _iqm(arr: np.ndarray) -> float:
     q25, q75 = np.percentile(arr, [25, 75])
     mask = (arr >= q25) & (arr <= q75)
     return float(arr[mask].mean()) if mask.any() else float(arr.mean())
+
+
+
+print_comparison_table([
+    "vanilla_diffusion_metrics.npz",
+    "qvpo+hy-q_metrics.npz",
+    "qvpo_metrics.npz",
+])
