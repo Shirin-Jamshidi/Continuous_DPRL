@@ -937,7 +937,7 @@ def build_config() -> argparse.Namespace:
     p.add_argument("--online_capacity",  type=int,   default=200_000)
 
     # Training schedule
-    p.add_argument("--offline_steps",    type=int,   default=20_000)
+    p.add_argument("--offline_steps",    type=int,   default=2_000)
     p.add_argument("--online_steps",     type=int,   default=10_000)
     p.add_argument("--log_interval",     type=int,   default=1_000)
     p.add_argument("--eval_interval_eps",type=int,   default=10)
