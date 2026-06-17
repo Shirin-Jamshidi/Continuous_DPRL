@@ -441,10 +441,10 @@ class VanillaDiffusionPolicy:
             # if step % cfg.eval_interval == 0:
             #     returns = self.evaluate(n_episodes=10)
 
-                tracker.log_eval(
-                    step=step,
-                    returns=self.evaluate(n_episodes=10)
-                )
+                # tracker.log_eval(
+                #     step=step,
+                #     returns=returns
+                # )
             tracker.save("vanilla_diffusion_metrics.npz") 
         print("\n  Training complete.\n")
 
