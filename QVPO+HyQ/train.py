@@ -798,8 +798,8 @@ class DiffusionQLTrainer:
                 self.log["episode_return"].append(ep_return)
                 ep_count += 1
                 # if ep_count % cfg.eval_interval_eps == 0:
-                #     avg = np.mean(self.log["episode_return"][-20:])
                 if ep_count % cfg.eval_interval_eps == 0:
+                    avg = np.mean(self.log["episode_return"][-20:])
                     returns = []
 
                     for _ in range(10):
