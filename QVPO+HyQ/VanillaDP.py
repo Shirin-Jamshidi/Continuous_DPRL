@@ -438,30 +438,26 @@ class VanillaDiffusionPolicy:
             if step % cfg.log_interval == 0:
                 avg_loss = sum(self.log["bc_loss"][-cfg.log_interval:]) / cfg.log_interval
                 print(f"  step {step:6d}/{cfg.train_steps}  bc_loss={avg_loss:.6f}")
-            
-            # if step % cfg.eval_interval == 0:
-            #     returns = self.evaluate(n_episodes=10)
-
-                # tracker.log_eval(
-                #     step=step,
-                #     returns=returns
-                # )
 
             if step % cfg.eval_interval == 0:
                 returns = []
 
-                for ep in range(10):
-                    state, _ = self.env.reset()
+                env = ContinuousCartPoleEnv()   # ✅ create env here
+
+                for ep in range(cfg.eval_episodes):
+                    state, _ = env.reset()
                     done = False
                     ep_ret = 0.0
 
                     while not done:
                         action = self.select_action(state)
-                        state, reward, term, trunc, _ = self.env.step(action)
+                        state, reward, term, trunc, _ = env.step(action)
                         ep_ret += reward
                         done = term or trunc
 
                     returns.append(ep_ret)
+
+                env.close()
 
                 tracker.log_eval(step=step, returns=returns)
             tracker.save("vanilla_diffusion_metrics.npz") 
