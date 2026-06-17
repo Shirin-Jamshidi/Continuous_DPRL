@@ -247,7 +247,7 @@ class GaussianDiffusion:
     """
     DDPM schedule + forward/reverse process for continuous actions.
 
-    Forward  q(ã_t | a₀) = N(√ᾱ_t · a₀,  (1−ᾱ_t) · I)
+    Forward  q(ã_t | a₀) = N(√ᾱ_t · a₀,  √(1−ᾱ_t) · I)
     Reverse  p_θ(ã_{t-1} | ã_t, s)  via  EpsilonNet
 
     Training loss (vanilla BC — the *only* loss used here):
