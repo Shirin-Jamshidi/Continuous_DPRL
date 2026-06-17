@@ -49,12 +49,14 @@ import math
 import random
 import argparse
 from typing import Tuple, Optional
+from metrics import MetricsTracker
 
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+import json
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -782,6 +784,7 @@ class DiffusionQLTrainer:
         state, _  = env.reset(seed=cfg.seed)
         ep_return = 0.0
         ep_count  = 0
+        tracker = MetricsTracker("QVPO+HyQ")
 
         for step in range(1, cfg.online_steps + 1):
             action = self.select_action(state)
@@ -807,6 +810,14 @@ class DiffusionQLTrainer:
 
             batch, off_idx = self.mixer.sample(cfg.batch_size)
             c_loss, p_loss = self._update_step(batch, off_idx)
+
+            # For comparison
+            tracker.log_step(
+                step=step,
+                policy_loss=p_loss,
+                critic_loss=c_loss
+            )
+
             self.log["critic_loss"].append(c_loss)
             self.log["policy_loss"].append(p_loss)
 

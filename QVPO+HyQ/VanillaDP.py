@@ -56,6 +56,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import json
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -410,6 +411,7 @@ class VanillaDiffusionPolicy:
         print(f"  T={cfg.n_diffusion_steps}  hidden={cfg.hidden_dim}  "
               f"batch={cfg.batch_size}  lr={cfg.lr}")
         print(f"{'='*60}\n")
+        tracker = MetricsTracker("VanillaDiffusion")
 
         for step in range(1, cfg.train_steps + 1):
             states, actions = self.demo.sample(cfg.batch_size)
@@ -423,9 +425,26 @@ class VanillaDiffusionPolicy:
 
             self.log["bc_loss"].append(loss.item())
 
+            # For comparison
+            tracker.log_step(
+                step=step,
+                policy_loss=loss.item(),
+                critic_loss=None   # no critic in vanilla
+            )
+
+
             if step % cfg.log_interval == 0:
                 avg_loss = sum(self.log["bc_loss"][-cfg.log_interval:]) / cfg.log_interval
                 print(f"  step {step:6d}/{cfg.train_steps}  bc_loss={avg_loss:.6f}")
+            
+            if step % cfg.eval_interval == 0:
+                returns = self.evaluate(n_episodes=10)
+
+                tracker.log_eval(
+                    step=step,
+                    returns=returns
+                )
+
 
         print("\n  Training complete.\n")
 
