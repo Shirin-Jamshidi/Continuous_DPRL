@@ -426,6 +426,7 @@ class VanillaDiffusionPolicy:
 
             self.log["bc_loss"].append(loss.item())
 
+
             # For comparison
             tracker.log_step(
                 step=step,
@@ -445,6 +446,24 @@ class VanillaDiffusionPolicy:
                 #     step=step,
                 #     returns=returns
                 # )
+                
+            if step % cfg.eval_interval == 0:
+                returns = []
+
+                for ep in range(10):
+                    state, _ = self.env.reset()
+                    done = False
+                    ep_ret = 0.0
+
+                    while not done:
+                        action = self.select_action(state)
+                        state, reward, term, trunc, _ = self.env.step(action)
+                        ep_ret += reward
+                        done = term or trunc
+
+                    returns.append(ep_ret)
+
+                tracker.log_eval(step=step, returns=returns)
             tracker.save("vanilla_diffusion_metrics.npz") 
         print("\n  Training complete.\n")
 
