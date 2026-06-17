@@ -263,15 +263,21 @@ def print_comparison_table(npz_paths: List[str]):
     # Sort by final eval mean descending
     for r in sorted(rows, key=lambda x: x["mean"], reverse=True):
         mean_std = f"{r['mean']:.1f} ± {r['std']:.1f}"
+        median = f"{r['median']:.1f}"
+        iqm = f"{r['iqm']:.1f}"
+        best = f"{r['best']:.0f}"
+        worst = f"{r['worst']:.0f}"
+        peak = f"{r['best_ever']:.1f}"
+        wall_min = f"{r['wall_min']:.1f}"
         line = (f"│{_c(r['method'],  col_w['method'])}│"
                 f"{_r(str(r['steps']), col_w['steps'])}│"
                 f"{_c(mean_std,       col_w['mean'])}│"
-                f"{_r(f"{r['median']:.1f}", col_w['median'])}│"
-                f"{_r(f"{r['iqm']:.1f}",    col_w['iqm'])}│"
-                f"{_r(f"{r['best']:.0f}",   col_w['best'])}│"
-                f"{_r(f"{r['worst']:.0f}",  col_w['worst'])}│"
-                f"{_r(f"{r['best_ever']:.1f}", col_w['peak'])}│"
-                f"{_r(f"{r['wall_min']:.1f}",  col_w['time'])}│")
+            f"{_r(median,        col_w['median'])}│"
+            f"{_r(iqm,           col_w['iqm'])}│"
+            f"{_r(best,          col_w['best'])}│"
+            f"{_r(worst,         col_w['worst'])}│"
+            f"{_r(peak,          col_w['peak'])}│"
+            f"{_r(wall_min,      col_w['time'])}│")
         print(f"  {line}")
 
     print(f"  └{sep}┘")
