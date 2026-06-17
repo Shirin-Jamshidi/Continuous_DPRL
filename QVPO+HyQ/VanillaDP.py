@@ -438,12 +438,12 @@ class VanillaDiffusionPolicy:
                 avg_loss = sum(self.log["bc_loss"][-cfg.log_interval:]) / cfg.log_interval
                 print(f"  step {step:6d}/{cfg.train_steps}  bc_loss={avg_loss:.6f}")
             
-            if step % cfg.eval_interval == 0:
-                returns = self.evaluate(n_episodes=10)
+            # if step % cfg.eval_interval == 0:
+            #     returns = self.evaluate(n_episodes=10)
 
                 tracker.log_eval(
                     step=step,
-                    returns=returns
+                    returns=self.evaluate(n_episodes=10)
                 )
             tracker.save("vanilla_diffusion_metrics.npz") 
         print("\n  Training complete.\n")
