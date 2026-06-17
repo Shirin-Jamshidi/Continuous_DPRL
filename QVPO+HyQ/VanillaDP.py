@@ -469,7 +469,11 @@ class VanillaDiffusionPolicy:
     def select_action(self, state: np.ndarray) -> np.ndarray:
         """Run the full reverse chain for one state; return (action_dim,) array."""
         s = torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
-        a = self.diffusion.p_sample(self.eps_net, s)   # (1, action_dim)
+        # a = self.diffusion.p_sample(self.eps_net, s)   # (1, action_dim)
+        # Multi-sample action selection
+        actions = [self.diffusion.p_sample(self.eps_net, s) for _ in range(10)]
+        a = actions[np.random.randint(len(actions))]
+
         return a.squeeze(0).cpu().numpy()
 
     # ── Evaluation ─────────────────────────────────────────────────────────
@@ -528,10 +532,10 @@ def build_config() -> argparse.Namespace:
     p.add_argument("--demo_path",  default="cartpole_demo_data.npz")
 
     # Diffusion model
-    p.add_argument("--n_diffusion_steps", type=int,   default=5,
+    p.add_argument("--n_diffusion_steps", type=int,   default=10,
                    help="DDPM chain length T")
-    p.add_argument("--beta_min",          type=float, default=0.1)
-    p.add_argument("--beta_max",          type=float, default=0.5)
+    p.add_argument("--beta_min",          type=float, default=0.0001)
+    p.add_argument("--beta_max",          type=float, default=0.02)
     p.add_argument("--hidden_dim",        type=int,   default=256)
     p.add_argument("--time_emb_dim",      type=int,   default=16)
 
