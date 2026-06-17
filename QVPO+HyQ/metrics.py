@@ -142,7 +142,7 @@ class MetricsTracker:
             eval_iqms       = np.array(self.eval_iqms,        dtype=np.float64),
             eval_wall_times = np.array(self.eval_wall_times,  dtype=np.float64),
         )
-        print(f"  [MetricsTracker] Saved → {path}")
+        # print(f"  [MetricsTracker] Saved → {path}")
 
     # ------------------------------------------------------------------
     def print_summary(self):
