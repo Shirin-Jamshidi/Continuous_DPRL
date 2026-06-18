@@ -797,10 +797,11 @@ class DiffusionQLTrainer:
             if done:
                 self.log["episode_return"].append(ep_return)
                 ep_count += 1
-                # if ep_count % cfg.eval_interval_eps == 0:
-                if ep_count % cfg.eval_interval_eps == 0:
+                if ep_count % cfg.eval_interval == 0:
                     avg = np.mean(self.log["episode_return"][-20:])
                     returns = []
+
+                    env = ContinuousCartPoleEnv(seed=cfg.seed + 999)
 
                     for _ in range(10):
                         s, _ = env.reset()
@@ -837,7 +838,7 @@ class DiffusionQLTrainer:
 
             self.log["critic_loss"].append(c_loss)
             self.log["policy_loss"].append(p_loss)
-            tracker.save("qvpo+hy-q_metrics.npz")
+        tracker.save("qvpo+hy-q_metrics.npz")
 
         print("  Online finetuning done.\n")
 
