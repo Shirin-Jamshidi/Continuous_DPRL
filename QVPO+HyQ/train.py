@@ -689,16 +689,16 @@ class DiffusionQLTrainer:
             row_idx  = torch.arange(B, device=self.device)
             a_sel    = acts_nd.view(B, cfg.Nd, -1)[row_idx, best_idx]   # (B, action_dim)
             w_sel    = weights[row_idx, best_idx]                         # (B,)
-            omega_s  = cfg.omega_ent * w_sel                             # (B,)
+            # omega_s  = cfg.omega_ent * w_sel                             # (B,)
 
         # Q-weighted VLO loss  (Eq. 6)
         loss_q = self.diffusion.q_weighted_vlo_loss(self.eps_net, a_sel, s, w_sel)
 
-        # Entropy regularisation  (Eq. 10)
-        loss_e = self.diffusion.entropy_loss(
-            self.eps_net, s, omega_s, cfg.Ne, cfg.force_mag
-        )
-        return loss_q + loss_e
+        # # Entropy regularisation  (Eq. 10)
+        # loss_e = self.diffusion.entropy_loss(
+        #     self.eps_net, s, omega_s, cfg.Ne, cfg.force_mag
+        # )
+        return loss_q #+ loss_e
 
     # ── Combined update step ───────────────────────────────────────────────
 
