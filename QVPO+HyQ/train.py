@@ -797,11 +797,9 @@ class DiffusionQLTrainer:
             if done:
                 self.log["episode_return"].append(ep_return)
                 ep_count += 1
-                if ep_count % cfg.eval_interval == 0:
+                if ep_count % cfg.eval_interval_eps == 0:
                     avg = np.mean(self.log["episode_return"][-20:])
                     returns = []
-
-                    env = ContinuousCartPoleEnv(seed=cfg.seed + 999)
 
                     for _ in range(10):
                         s, _ = env.reset()
@@ -940,8 +938,8 @@ def build_config() -> argparse.Namespace:
     # Training schedule
     p.add_argument("--offline_steps",    type=int,   default=1_000)
     p.add_argument("--online_steps",     type=int,   default=100_000)
-    p.add_argument("--log_interval",     type=int,   default=100)
-    p.add_argument("--eval_interval",type=int,   default=10_000)
+    p.add_argument("--log_interval",     type=int,   default=1_000)
+    p.add_argument("--eval_interval_eps",type=int,   default=10)
     p.add_argument("--save_path",        default="checkpoints/diffusion_ql.pt")
 
     return p.parse_args()
