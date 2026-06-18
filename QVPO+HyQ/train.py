@@ -938,7 +938,7 @@ def build_config() -> argparse.Namespace:
     # Training schedule
     p.add_argument("--offline_steps",    type=int,   default=1_000)
     p.add_argument("--online_steps",     type=int,   default=100_000)
-    p.add_argument("--log_interval",     type=int,   default=1_000)
+    p.add_argument("--log_interval",     type=int,   default=100)
     p.add_argument("--eval_interval_eps",type=int,   default=10)
     p.add_argument("--save_path",        default="checkpoints/diffusion_ql.pt")
 
