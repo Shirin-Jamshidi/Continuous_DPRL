@@ -30,6 +30,7 @@ Architecture
   DiffusionQLTrainer     : offline pretraining → online finetuning loop
 """
 ## Corresponding to the tabular Q-learning version for data collection (no PyTorch, no function approximation)
+from curses import raw
 import os
 import copy
 import math
@@ -82,6 +83,8 @@ class OfflineBuffer:
         self.dones       = dones.to(device)
         self.size        = len(states)
         self.device      = device
+        rewards = torch.tensor(raw["rewards"], dtype=torch.float32).unsqueeze(-1)
+        dones   = torch.tensor(raw["dones"],   dtype=torch.float32).unsqueeze(-1)
 
     def sample(self, batch_size: int) -> dict:
         idx = torch.randint(0, self.size, (batch_size,), device=self.device)
@@ -106,9 +109,11 @@ class OnlineBuffer:
 
         self.states      = torch.zeros((capacity, state_dim),  device=device)
         self.actions     = torch.zeros((capacity, action_dim), device=device)
-        self.rewards     = torch.zeros((capacity,),            device=device)
+        # self.rewards     = torch.zeros((capacity,),            device=device)
         self.next_states = torch.zeros((capacity, state_dim),  device=device)
-        self.dones       = torch.zeros((capacity,),            device=device)
+        # self.dones       = torch.zeros((capacity,),            device=device)
+        self.rewards = torch.zeros((capacity, 1), device=device)
+        self.dones   = torch.zeros((capacity, 1), device=device)
 
     @property
     def size(self) -> int:
