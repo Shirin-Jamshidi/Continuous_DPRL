@@ -797,10 +797,38 @@ class DiffusionQLTrainer:
             if done:
                 self.log["episode_return"].append(ep_return)
                 ep_count += 1
-                if ep_count % cfg.eval_interval_eps == 0:
-                    avg = np.mean(self.log["episode_return"][-20:])
-                    env_eval = ContinuousCartPoleEnv(seed=cfg.seed + 999)
+                # if ep_count % cfg.eval_interval_eps == 0:
+                #     avg = np.mean(self.log["episode_return"][-20:])
+                #     env_eval = ContinuousCartPoleEnv(seed=cfg.seed + 999)
+                #     returns = []
+
+                #     for ep in range(cfg.eval_episodes):
+                #         s, _ = env_eval.reset(seed=cfg.seed + ep)
+                #         done = False
+                #         ep_ret = 0.0
+
+                #         while not done:
+                #             a = self.select_action(s)
+                #             s, r, term, trunc, _ = env_eval.step(a)
+                #             ep_ret += r
+                #             done = term or trunc
+
+                #         returns.append(ep_ret)
+
+                #     env_eval.close()
+
+
+                #     tracker.log_eval(step=step, returns=returns)
+                #     print(f"  [online {step:7d}/{cfg.online_steps}]  "
+                #           f"ep={ep_count:4d}  avg_return(20)={avg:6.1f}  "
+                #           f"β={self.mixer.beta:.3f}  online={self.online_buf.size}")
+                # ep_return = 0.0
+                # state, _ = env.reset()
+                # ✅ STEP-BASED EVALUATION (aligned with QVPO)
+                if step % cfg.eval_interval_eps == 0 and step > 0:
+
                     returns = []
+                    env_eval = ContinuousCartPoleEnv(seed=cfg.seed + 999)
 
                     for ep in range(cfg.eval_episodes):
                         s, _ = env_eval.reset(seed=cfg.seed + ep)
@@ -817,13 +845,17 @@ class DiffusionQLTrainer:
 
                     env_eval.close()
 
+                    tracker.log_eval(
+                        step=step,
+                        returns=returns
+                    )
 
-                    tracker.log_eval(step=step, returns=returns)
+                    avg = np.mean(returns)
+
                     print(f"  [online {step:7d}/{cfg.online_steps}]  "
-                          f"ep={ep_count:4d}  avg_return(20)={avg:6.1f}  "
-                          f"β={self.mixer.beta:.3f}  online={self.online_buf.size}")
-                ep_return = 0.0
-                state, _ = env.reset()
+                        f"avg_return={avg:6.1f}  β={self.mixer.beta:.3f}  "
+                        f"online={self.online_buf.size}")
+
 
             if self.online_buf.size < cfg.batch_size:
                 continue
