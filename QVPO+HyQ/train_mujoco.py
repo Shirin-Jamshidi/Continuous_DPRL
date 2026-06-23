@@ -68,6 +68,8 @@ class OfflineBuffer:
     def __init__(self, path: str, device: torch.device):
         raw = np.load(path)
 
+        print(raw.files)
+        exit()
         states     = torch.tensor(raw["states"],      dtype=torch.float32)
         actions = torch.tensor(raw["actions"], dtype=torch.float32)
         rewards    = torch.tensor(raw["rewards"],     dtype=torch.float32)
