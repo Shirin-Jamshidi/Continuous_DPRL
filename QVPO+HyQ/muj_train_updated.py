@@ -1,4 +1,39 @@
-import gymnasium as gym   # ✅ NEW
+"""
+Diffusion Q-Learning for Continuous CartPole
+=============================================
+Combines:
+  - QVPO  : Q-weighted VLO loss with Gaussian (continuous) diffusion policy
+  - Hy-Q  : Hybrid offline + online Q-learning with importance-weighted mixing
+
+Key change vs. previous version
+---------------------------------
+  The previous discrete CartPole + sign-mapping approach collapsed to ~20-30
+  return because the continuous Gaussian diffusion policy and the discrete
+  action space are fundamentally mismatched: a tanh-squashed scalar loses all
+  gradient signal when discretised by a step function.
+
+  Following the professor's suggestion, we instead **replace the CartPole
+  dynamics model** with a native continuous-force variant:
+
+
+  The offline demo data (discrete 0/1) is remapped at load time:
+      discrete 0 → force  -force_mag   (push left)
+      discrete 1 → force  +force_mag   (push right)
+  These are valid points in the continuous action space so there is no
+  information loss and the diffusion model can learn to interpolate between
+  them as training progresses.
+
+Architecture
+------------
+  OfflineBuffer          : loads demo data, converts actions to continuous
+  OnlineBuffer           : ring buffer for online experience
+  GaussianDiffusion      : DDPM with linear β schedule, ε-prediction network
+  EpsilonNet             : MLP(a_t, s, t) → ε̂  (noise prediction)
+  TwinQNetwork           : Q(s,a) → scalar, twin critics (SAC-style)
+  HyQMixer               : priority-weighted offline/online batch mixing
+  DiffusionQLTrainer     : offline pretraining → online finetuning loop
+"""
+## Corresponding to the tabular Q-learning version for data collection (no PyTorch, no function approximation)
 import os
 import copy
 import math
@@ -7,16 +42,16 @@ import argparse
 from typing import Tuple, Optional
 from metrics import MetricsTracker
 
+import gymnasium as gym
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-import json
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# 0. Reproducibility
+# 0.  Reproducibility
 # ══════════════════════════════════════════════════════════════════════════════
 
 def set_seed(seed: int = 42):
@@ -28,141 +63,228 @@ def set_seed(seed: int = 42):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# 2. Replay Buffers (MODIFIED OFFLINE)
+# 2.  Replay Buffers
 # ══════════════════════════════════════════════════════════════════════════════
 
 class OfflineBuffer:
-    def __init__(self, path: str, device: torch.device):
+    """
+    Loads the static demonstration dataset and converts discrete actions
+    {0, 1} → continuous forces {-force_mag, +force_mag}.
+
+    Rationale: the demo data came from a discrete Q-learning agent, but our
+    continuous CartPole environment accepts scalar forces.  Mapping
+        0 → -force_mag  (push left at full force)
+        1 → +force_mag  (push right at full force)
+    preserves the original policy's intent exactly and places the demo
+    actions at valid extremes of the continuous action space.
+    """
+
+    def __init__(self, path: str, device: torch.device, force_mag: float = 10.0):
         raw = np.load(path)
 
-        self.states      = torch.tensor(raw["states"], dtype=torch.float32, device=device)
-        self.actions     = torch.tensor(raw["actions"], dtype=torch.float32, device=device)  # ✅ already continuous
-        self.rewards     = torch.tensor(raw["rewards"], dtype=torch.float32, device=device)
-        self.next_states = torch.tensor(raw["next_states"], dtype=torch.float32, device=device)
-        self.dones       = torch.tensor(raw["dones"], dtype=torch.float32, device=device)
+        states     = torch.tensor(raw["states"],      dtype=torch.float32)
+        actions = torch.tensor(raw["actions"], dtype=torch.float32)
+        rewards    = torch.tensor(raw["rewards"],     dtype=torch.float32)
+        next_states= torch.tensor(raw["next_states"], dtype=torch.float32)
 
-        self.size   = len(self.states)
-        self.device = device
+        # No 'dones' key — all transitions are mid-episode (reward = 1 always)
+        dones = torch.tensor(raw["terminals"], dtype=torch.float32)
 
-        print(f"[OfflineBuffer] Loaded {self.size:,} transitions (continuous actions)")
+        self.states      = states.to(device)
+        self.actions     = actions.to(device)
+        self.rewards     = rewards.to(device)
+        self.next_states = next_states.to(device)
+        self.dones       = dones.to(device)
+        self.size        = len(states)
+        self.device      = device
+
+        print(f"[OfflineBuffer] {self.size:,} transitions | "
+              f"actions remapped: 0→{-force_mag:.1f} N, 1→{+force_mag:.1f} N")
 
     def sample(self, batch_size: int) -> dict:
         idx = torch.randint(0, self.size, (batch_size,), device=self.device)
         return {
-            "states": self.states[idx],
-            "actions": self.actions[idx],
-            "rewards": self.rewards[idx],
+            "states":      self.states[idx],
+            "actions":     self.actions[idx],      # (B, 1) continuous
+            "rewards":     self.rewards[idx],
             "next_states": self.next_states[idx],
-            "dones": self.dones[idx],
+            "dones":       self.dones[idx],
         }
 
 
 class OnlineBuffer:
-    def __init__(self, capacity, state_dim, action_dim, device):
+    """GPU ring-buffer for online experience from ContinuousCartPoleEnv."""
+
+    def __init__(self, capacity: int, state_dim: int, action_dim: int,
+                 device: torch.device):
         self.capacity = capacity
         self.device   = device
         self._ptr     = 0
         self._full    = False
 
-        self.states      = torch.zeros((capacity, state_dim), device=device)
+        self.states      = torch.zeros((capacity, state_dim),  device=device)
         self.actions     = torch.zeros((capacity, action_dim), device=device)
-        self.rewards     = torch.zeros((capacity,), device=device)
-        self.next_states = torch.zeros((capacity, state_dim), device=device)
-        self.dones       = torch.zeros((capacity,), device=device)
+        self.rewards     = torch.zeros((capacity,),            device=device)
+        self.next_states = torch.zeros((capacity, state_dim),  device=device)
+        self.dones       = torch.zeros((capacity,),            device=device)
 
     @property
-    def size(self):
+    def size(self) -> int:
         return self.capacity if self._full else self._ptr
 
-    def add(self, s, a, r, s2, d):
+    def add(self, state: np.ndarray, action: np.ndarray,
+            reward: float, next_state: np.ndarray, done: float):
         i = self._ptr
-        self.states[i] = torch.tensor(s, device=self.device)
-        self.actions[i] = torch.tensor(a, device=self.device)
-        self.rewards[i] = r
-        self.next_states[i] = torch.tensor(s2, device=self.device)
-        self.dones[i] = d
+        self.states[i]      = torch.as_tensor(state,      dtype=torch.float32, device=self.device)
+        self.actions[i]     = torch.as_tensor(action,     dtype=torch.float32, device=self.device)
+        self.rewards[i]     = reward
+        self.next_states[i] = torch.as_tensor(next_state, dtype=torch.float32, device=self.device)
+        self.dones[i]       = done
         self._ptr = (self._ptr + 1) % self.capacity
         if self._ptr == 0:
             self._full = True
 
-    def sample(self, batch_size):
+    def sample(self, batch_size: int) -> dict:
         idx = torch.randint(0, self.size, (batch_size,), device=self.device)
         return {
-            "states": self.states[idx],
-            "actions": self.actions[idx],
-            "rewards": self.rewards[idx],
+            "states":      self.states[idx],
+            "actions":     self.actions[idx],
+            "rewards":     self.rewards[idx],
             "next_states": self.next_states[idx],
-            "dones": self.dones[idx],
+            "dones":       self.dones[idx],
         }
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# 3. Hy-Q Mixer (UNCHANGED)
+# 3.  Hy-Q Mixer
 # ══════════════════════════════════════════════════════════════════════════════
 
 class HyQMixer:
-    def __init__(self, offline_buf, online_buf,
-                 beta_start=1.0, beta_end=0.25,
-                 anneal_steps=50000, td_alpha=0.6):
-        self.offline = offline_buf
-        self.online  = online_buf
-        self.beta_start = beta_start
-        self.beta_end = beta_end
+    """
+    Hy-Q hybrid batch sampler.
+
+    β decays linearly from β_start → β_end over anneal_steps gradient steps.
+    Offline samples are weighted by |TD-error|^α (priority weighting).
+    """
+
+    def __init__(
+        self,
+        offline_buf:  OfflineBuffer,
+        online_buf:   OnlineBuffer,
+        beta_start:   float = 1.0,
+        beta_end:     float = 0.25,
+        anneal_steps: int   = 50_000,
+        td_alpha:     float = 0.6,
+    ):
+        self.offline      = offline_buf
+        self.online       = online_buf
+        self.beta_start   = beta_start
+        self.beta_end     = beta_end
         self.anneal_steps = anneal_steps
-        self.td_alpha = td_alpha
-        self._step = 0
-        self._priorities = np.ones(len(self.offline.states))
+        self.td_alpha     = td_alpha
+        self._step        = 0
+        self._priorities  = np.ones(offline_buf.size, dtype=np.float32)
 
     @property
-    def beta(self):
-        frac = min(self._step / self.anneal_steps, 1.0)
+    def beta(self) -> float:
+        frac = min(self._step / max(self.anneal_steps, 1), 1.0)
         return self.beta_start + frac * (self.beta_end - self.beta_start)
 
-    def sample(self, batch_size):
+    def update_priorities(self, indices: np.ndarray, td_errors: np.ndarray):
+        self._priorities[indices] = (np.abs(td_errors) + 1e-6) ** self.td_alpha
+
+    def sample(self, batch_size: int) -> Tuple[dict, Optional[np.ndarray]]:
         self._step += 1
-        n_off = int(self.beta * batch_size)
-        n_on  = batch_size - n_off
+        n_offline = int(round(self.beta * batch_size))
+        n_online  = batch_size - n_offline
+        batches, offline_idx = [], None
 
-        batch_off = self.offline.sample(n_off) if n_off > 0 else None
-        batch_on  = self.online.sample(n_on) if n_on > 0 else None
+        if n_offline > 0:
+            probs = self._priorities / self._priorities.sum()
+            offline_idx = np.random.choice(
+                self.offline.size, size=n_offline, replace=False, p=probs
+            )
+            idx_t = torch.tensor(offline_idx, device=self.offline.device)
+            batches.append({
+                "states":      self.offline.states[idx_t],
+                "actions":     self.offline.actions[idx_t],
+                "rewards":     self.offline.rewards[idx_t],
+                "next_states": self.offline.next_states[idx_t],
+                "dones":       self.offline.dones[idx_t],
+            })
 
-        batches = [b for b in [batch_off, batch_on] if b is not None]
+        if n_online > 0:
+            src = self.online if self.online.size >= n_online else self.offline
+            batches.append(src.sample(n_online))
 
         merged = {k: torch.cat([b[k] for b in batches], dim=0) for k in batches[0]}
-        return merged, None
+        return merged, offline_idx
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# 4. Diffusion (UNCHANGED)
+# 4.  Gaussian Diffusion (continuous action space)
 # ══════════════════════════════════════════════════════════════════════════════
 
 class SinusoidalTimeEmbedding(nn.Module):
-    def __init__(self, dim):
+    def __init__(self, dim: int):
         super().__init__()
         self.dim = dim
 
-    def forward(self, t):
-        half = self.dim // 2
-        freqs = torch.exp(-math.log(10000) * torch.arange(half, device=t.device) / (half - 1))
-        args = t.unsqueeze(1) * freqs.unsqueeze(0)
+    def forward(self, t: torch.Tensor) -> torch.Tensor:
+        half  = self.dim // 2
+        freqs = torch.exp(
+            -math.log(10_000) *
+            torch.arange(half, device=t.device, dtype=torch.float32) / (half - 1)
+        )
+        args = t.float().unsqueeze(1) * freqs.unsqueeze(0)
         return torch.cat([args.sin(), args.cos()], dim=-1)
 
 
 class EpsilonNet(nn.Module):
-    def __init__(self, state_dim, action_dim):
+    """
+    ε_θ(ã_t, s, t) → ε̂  — noise prediction network.
+
+    Input  : cat(ã_t, s, t_emb)   noisy action + state + time embedding
+    Output : ε̂ ∈ R^{action_dim}  same shape as the action
+    """
+
+    def __init__(
+        self,
+        state_dim:    int,
+        action_dim:   int,
+        hidden_dim:   int = 256,
+        time_emb_dim: int = 16,
+        n_steps:      int = 5,
+    ):
         super().__init__()
         self.action_dim = action_dim
-        self.time_emb = SinusoidalTimeEmbedding(16)
-        self.net = nn.Sequential(
-            nn.Linear(state_dim + action_dim + 16, 256),
-            nn.Mish(),
-            nn.Linear(256, 256),
-            nn.Mish(),
-            nn.Linear(256, action_dim)
-        )
+        self.n_steps    = n_steps
+        self.time_emb   = SinusoidalTimeEmbedding(time_emb_dim)
 
-    def forward(self, a, s, t):
-        return self.net(torch.cat([a, s, self.time_emb(t)], dim=-1))
+        in_dim = action_dim + state_dim + time_emb_dim
+        self.net = nn.Sequential(
+            nn.Linear(in_dim, hidden_dim), nn.Mish(),
+            nn.Linear(hidden_dim, hidden_dim), nn.Mish(),
+            nn.Linear(hidden_dim, hidden_dim), nn.Mish(),
+            nn.Linear(hidden_dim, action_dim),
+        )
+        self._init_weights()
+
+    def _init_weights(self):
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                nn.init.orthogonal_(m.weight, gain=math.sqrt(2))
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
+        last = list(self.net.children())[-1]
+        nn.init.uniform_(last.weight, -1e-3, 1e-3)
+        nn.init.zeros_(last.bias)
+
+    def forward(self, a_t: torch.Tensor, state: torch.Tensor,
+                t: torch.Tensor) -> torch.Tensor:
+        t_emb = self.time_emb(t)
+        x = torch.cat([a_t, state, t_emb], dim=-1)
+        return self.net(x)
 
 
 class GaussianDiffusion:
@@ -193,12 +315,16 @@ class GaussianDiffusion:
         self.sqrt_1mab      = (1.0 - alpha_bar).sqrt()
         self.posterior_var  = (1.0 - alpha_bar_prev) / (1.0 - alpha_bar) * betas
         self._device        = None
+        self.action_low = None
+        self.action_high = None
 
     def to(self, device: torch.device) -> "GaussianDiffusion":
         for attr in ["betas", "alpha_bar", "alpha_bar_prev",
                      "sqrt_ab", "sqrt_1mab", "posterior_var"]:
             setattr(self, attr, getattr(self, attr).to(device))
         self._device = device
+        self.action_low = torch.tensor(cfg.action_low, device=device)
+        self.action_high = torch.tensor(cfg.action_high, device=device)
         return self
 
     # ── Forward process ────────────────────────────────────────────────────
@@ -251,6 +377,10 @@ class GaussianDiffusion:
         a_t = torch.randn(state.shape[0], eps_net.action_dim, device=state.device)
         for t_val in reversed(range(1, self.T + 1)):
             a_t = self.p_sample_step(eps_net, a_t, state, t_val)
+            a_t = torch.clamp(
+            a_t,
+            self.action_low,
+            self.action_high)
         return a_t
 
     # ── Q-weighted VLO loss (QVPO Eq. 6) ──────────────────────────────────
@@ -456,12 +586,7 @@ class DiffusionQLTrainer:
 
         # Q-weighted VLO loss  (Eq. 6)
         loss_q = self.diffusion.q_weighted_vlo_loss(self.eps_net, a_sel, s, w_sel)
-
-        # # Entropy regularisation  (Eq. 10)
-        # loss_e = self.diffusion.entropy_loss(
-        #     self.eps_net, s, omega_s, cfg.Ne, cfg.force_mag
-        # )
-        return loss_q #+ loss_e
+        return loss_q 
 
     # ── Combined update step ───────────────────────────────────────────────
 
@@ -502,7 +627,15 @@ class DiffusionQLTrainer:
         s_rep      = s.expand(self.cfg.K_b, -1)
         q_vals     = q_min(self.q1, self.q2, s_rep, candidates)
         best       = candidates[q_vals.argmax()]
-        return best.cpu().numpy()                                   # (action_dim,)
+        action = best.cpu().numpy()
+
+        action = np.clip(
+            action,
+            self.cfg.action_low,
+            self.cfg.action_high
+        )
+
+        return action                                 # (action_dim,)
 
     # ── Phase 1: Offline pretraining ──────────────────────────────────────
 
@@ -547,7 +680,7 @@ class DiffusionQLTrainer:
         state, _  = env.reset(seed=cfg.seed)
         ep_return = 0.0
         ep_count  = 0
-        tracker = MetricsTracker("HyQVPO")
+        tracker = MetricsTracker("QVPO+HyQ")
 
         for step in range(1, cfg.online_steps + 1):
             action = self.select_action(state)
@@ -560,11 +693,12 @@ class DiffusionQLTrainer:
             if done:
                 self.log["episode_return"].append(ep_return)
                 ep_count += 1
+
                 # ✅ STEP-BASED EVALUATION (aligned with QVPO)
                 if step % cfg.eval_interval_eps == 0 and step > 0:
 
                     returns = []
-                    env_eval = env(seed=cfg.seed + 999)
+                    env_eval = gym.make(cfg.env_name)
 
                     for ep in range(cfg.eval_episodes):
                         s, _ = env_eval.reset(seed=cfg.seed + ep)
@@ -608,7 +742,7 @@ class DiffusionQLTrainer:
 
             self.log["critic_loss"].append(c_loss)
             self.log["policy_loss"].append(p_loss)
-        tracker.save("Mujococo_HyQVPO_metrics.npz")
+        tracker.save("qvpo+hy-q_metrics.npz")
 
         print("  Online finetuning done.\n")
 
@@ -655,37 +789,107 @@ class DiffusionQLTrainer:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# 7. CONFIG
+# 7.  Configuration & Entry Point
 # ══════════════════════════════════════════════════════════════════════════════
 
-def build_config():
-    p = argparse.ArgumentParser()
+def build_config() -> argparse.Namespace:
+    p = argparse.ArgumentParser(
+        "Diffusion Q-Learning (QVPO + Hy-Q) — Mujococo"
+    )
 
-    p.add_argument("--env", type=str, default="Hopper-v4")  # ✅ NEW
-    p.add_argument("--demo_path", default="hopper_dataset.npz")
+    # Environment
+    p.add_argument(
+    "--env_name",
+    type=str,
+    default="HalfCheetah-v5",
+    choices=[
+        "Hopper-v5",
+        "Walker2d-v5",
+        "HalfCheetah-v5",
+        "Ant-v5",
+        "Humanoid-v5"])
+    p.add_argument("--max_steps",   type=int,   default=500)
+    p.add_argument("--seed",        type=int,   default=42)
 
-    p.add_argument("--batch_size", type=int, default=256)
-    p.add_argument("--online_capacity", type=int, default=200000)
+    # Demo data
+    p.add_argument("--demo_path",   default="hopper_dataset.npz")
+
+    # Diffusion model
+    p.add_argument("--n_diffusion_steps", type=int,   default=5,
+                   help="DDPM chain length T  (paper: 5)")
+    p.add_argument("--beta_min",          type=float, default=0.1)
+    p.add_argument("--beta_max",          type=float, default=0.5)
+    p.add_argument("--hidden_dim",        type=int,   default=256)
+    p.add_argument("--time_emb_dim",      type=int,   default=16)
+
+    # QVPO policy update
+    p.add_argument("--Nd",         type=int,   default=64,
+                   help="Policy samples per state for qadv weights  (paper: 64)")
+    p.add_argument("--Ne",         type=int,   default=64,
+                   help="Uniform samples per state for entropy term  (paper: 64)")
+    p.add_argument("--omega_ent",  type=float, default=1.0,
+                   help="Entropy regularisation coefficient  (paper: 1.0)")
+    p.add_argument("--K_b",        type=int,   default=10,
+                   help="Behaviour policy candidates  (paper: 10)")
+    p.add_argument("--K_t",        type=int,   default=2,
+                   help="Target policy candidates  (paper: 2)")
+
+    # Critic / RL
+    p.add_argument("--gamma",      type=float, default=0.99)
+    p.add_argument("--tau",        type=float, default=0.005)
+    p.add_argument("--lr_q",       type=float, default=3e-4)
+    p.add_argument("--lr_policy",  type=float, default=3e-4)
+    p.add_argument("--batch_size", type=int,   default=256)
+
+    # Hy-Q
+    p.add_argument("--hyq_beta_end",     type=float, default=0.25)
+    p.add_argument("--hyq_anneal_steps", type=int,   default=50_000)
+    p.add_argument("--hyq_td_alpha",     type=float, default=0.6)
+    p.add_argument("--online_capacity",  type=int,   default=200_000)
+
+    # Training schedule
+    p.add_argument("--offline_steps",    type=int,   default=1_000)
+    p.add_argument("--online_steps",     type=int,   default=100_000)
+    p.add_argument("--log_interval",     type=int,   default=100)
+    p.add_argument("--eval_episodes",     type=int,   default=10)
+    p.add_argument("--eval_interval_eps",type=int,   default=10)
+    p.add_argument("--save_path",        default="checkpoints/HyQVPO.pt")
 
     return p.parse_args()
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# MAIN
-# ══════════════════════════════════════════════════════════════════════════════
-
 def main():
-    cfg = build_config()
+    cfg    = build_config()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"\n[Device] {device}")
+    set_seed(cfg.seed)
 
-    env = gym.make(cfg.env)
+    env = gym.make(cfg.env_name)
 
-    cfg.state_dim  = env.observation_space.shape[0]   # ✅ dynamic
+    cfg.state_dim = env.observation_space.shape[0]
     cfg.action_dim = env.action_space.shape[0]
 
-    # trainer = DiffusionQLTrainer(cfg, device, env)
+    cfg.action_low  = env.action_space.low
+    cfg.action_high = env.action_space.high
 
-    # print(f"Running {cfg.env} | state_dim={cfg.state_dim} | action_dim={cfg.action_dim}")
+
+    trainer = DiffusionQLTrainer(cfg, device)
+
+    # Phase 1 — offline pretraining
+    trainer.offline_pretrain()
+    trainer.save(cfg.save_path.replace(".pt", "_offline.pt"))
+
+    print("\n  [Eval] After offline pretraining:")
+    trainer.evaluate(env, n_episodes=10)
+
+    # Phase 2 — online finetuning
+    trainer.online_finetune(env)
+    trainer.save(cfg.save_path)
+
+    print("\n  [Eval] After online finetuning:")
+    trainer.evaluate(env, n_episodes=20)
+
+    env.close()
 
 
 if __name__ == "__main__":
