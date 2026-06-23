@@ -68,7 +68,7 @@ def collect_policy(env_name, num_steps, policy, save_path):
         if done or trunc:
             s, _ = env.reset()
 
-    np.savez(save_path, s=s_list, a=a_list, r=r_list, s2=s2_list, d=d_list)
+    np.savez(save_path, states=s_list, actions=a_list, rewards=r_list, next_states=s2_list, dones=d_list)
 
 
 # =============================================================================
