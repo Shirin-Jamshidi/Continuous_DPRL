@@ -444,6 +444,7 @@ class DiffusionQLTrainer:
 
         # ── Diffusion schedule ────────────────────────────────────────────────
         self.diffusion = GaussianDiffusion(
+            cfg=cfg,
             n_steps=cfg.n_diffusion_steps,
             beta_min=cfg.beta_min,
             beta_max=cfg.beta_max,
