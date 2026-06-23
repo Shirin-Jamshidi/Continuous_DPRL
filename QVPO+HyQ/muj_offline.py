@@ -31,11 +31,11 @@ def collect_random(env_name, num_steps, save_path):
 
     np.savez(
         save_path,
-        s=np.array(s_list),
-        a=np.array(a_list),
-        r=np.array(r_list),
-        s2=np.array(s2_list),
-        d=np.array(d_list),
+        states=np.array(s_list),
+        actions=np.array(a_list),
+        rewards=np.array(r_list),
+        next_states=np.array(s2_list),
+        dones=np.array(d_list),
     )
 
     print(f"Saved dataset to {save_path}")
