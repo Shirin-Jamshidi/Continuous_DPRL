@@ -15,10 +15,6 @@ Key change vs. previous version
   Following the professor's suggestion, we instead **replace the CartPole
   dynamics model** with a native continuous-force variant:
 
-
-  The offline demo data (discrete 0/1) is remapped at load time:
-      discrete 0 → force  -force_mag   (push left)
-      discrete 1 → force  +force_mag   (push right)
   These are valid points in the continuous action space so there is no
   information loss and the diffusion model can learn to interpolate between
   them as training progresses.
@@ -67,19 +63,9 @@ def set_seed(seed: int = 42):
 # ══════════════════════════════════════════════════════════════════════════════
 
 class OfflineBuffer:
-    """
-    Loads the static demonstration dataset and converts discrete actions
-    {0, 1} → continuous forces {-force_mag, +force_mag}.
+    
 
-    Rationale: the demo data came from a discrete Q-learning agent, but our
-    continuous CartPole environment accepts scalar forces.  Mapping
-        0 → -force_mag  (push left at full force)
-        1 → +force_mag  (push right at full force)
-    preserves the original policy's intent exactly and places the demo
-    actions at valid extremes of the continuous action space.
-    """
-
-    def __init__(self, path: str, device: torch.device, force_mag: float = 10.0):
+    def __init__(self, path: str, device: torch.device):
         raw = np.load(path)
 
         states     = torch.tensor(raw["states"],      dtype=torch.float32)
@@ -97,9 +83,6 @@ class OfflineBuffer:
         self.dones       = dones.to(device)
         self.size        = len(states)
         self.device      = device
-
-        print(f"[OfflineBuffer] {self.size:,} transitions | "
-              f"actions remapped: 0→{-force_mag:.1f} N, 1→{+force_mag:.1f} N")
 
     def sample(self, batch_size: int) -> dict:
         idx = torch.randint(0, self.size, (batch_size,), device=self.device)
@@ -294,10 +277,6 @@ class GaussianDiffusion:
     Schedule : T steps, β linearly spaced in [beta_min, beta_max].
     Forward  : q(ã_t | a_0) = N(√ᾱ_t · a_0,  (1−ᾱ_t)·I)
     Reverse  : p_θ(ã_{t-1} | ã_t, s) via EpsilonNet
-
-    The action is NOT tanh-squashed here — the force magnitude is bounded
-    by environment clipping (±force_mag), which is a more honest inductive
-    bias for physics-based control than tanh.
     """
 
     def __init__(self, n_steps: int = 5, beta_min: float = 0.1,
@@ -398,28 +377,6 @@ class GaussianDiffusion:
         per_sample = ((noise - eps_hat) ** 2).mean(dim=-1)
         return (weights * per_sample).mean()
 
-    # ── Entropy regularisation (QVPO Eq. 10) ──────────────────────────────
-
-    def entropy_loss(self, eps_net: EpsilonNet, state: torch.Tensor,
-                     omega_ent_s: torch.Tensor,
-                     n_uniform: int, force_mag: float) -> torch.Tensor:
-        """
-        Push policy toward higher entropy by fitting uniform actions.
-        Uniform actions drawn from U(-force_mag, +force_mag) — the full
-        physical range of the continuous CartPole action space.
-        """
-        B = state.shape[0]
-        state_rep    = state.repeat_interleave(n_uniform, dim=0)
-        omega_rep    = omega_ent_s.repeat_interleave(n_uniform, dim=0)
-        a_unif = (torch.rand(B * n_uniform, eps_net.action_dim,
-                             device=state.device) * 2.0 - 1.0) * force_mag
-        t = torch.randint(1, self.T + 1, (B * n_uniform,), device=state.device)
-        a_t, noise = self.q_sample(a_unif, t)
-        eps_hat    = eps_net(a_t, state_rep, t)
-        per_sample = ((noise - eps_hat) ** 2).mean(dim=-1)
-        return (omega_rep * per_sample).mean()
-
-
 # ══════════════════════════════════════════════════════════════════════════════
 # 5.  Twin Q-Network  Q(s, a) → scalar
 # ══════════════════════════════════════════════════════════════════════════════
@@ -480,7 +437,7 @@ class DiffusionQLTrainer:
         self.device = device
 
         # ── Buffers ──────────────────────────────────────────────────────────
-        self.offline_buf = OfflineBuffer(cfg.demo_path, device, cfg.force_mag)
+        self.offline_buf = OfflineBuffer(cfg.demo_path, device)
         self.online_buf  = OnlineBuffer(
             cfg.online_capacity, cfg.state_dim, cfg.action_dim, device
         )
