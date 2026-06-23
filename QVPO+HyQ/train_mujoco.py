@@ -496,10 +496,11 @@ class DiffusionQLTrainer:
     # ── Critic update ──────────────────────────────────────────────────────
 
     def _critic_loss(self, batch: dict) -> Tuple[torch.Tensor, np.ndarray]:
-        s, a, r, s_, d = (
-            batch["states"], batch["actions"], batch["rewards"],
-            batch["next_states"], batch["dones"],
-        )
+        s = batch["states"]
+        a = batch["actions"]
+        r = batch["rewards"].squeeze(-1)
+        s_ = batch["next_states"]
+        d = batch["dones"].squeeze(-1)
         cfg = self.cfg
 
         with torch.no_grad():
@@ -680,9 +681,10 @@ class DiffusionQLTrainer:
 
                     avg = np.mean(returns)
 
-                    print(f"  [online {step:7d}/{cfg.online_steps}]  "
-                        f"avg_return={avg:6.1f}  β={self.mixer.beta:.3f}  "
-                        f"online={self.online_buf.size}")
+                    if step % 100 == 0 and step > 0:
+                        print(f"  [online {step:7d}/{cfg.online_steps}]  "
+                            f"avg_return={avg:6.1f}  β={self.mixer.beta:.3f}  "
+                            f"online={self.online_buf.size}")
 
 
             if self.online_buf.size < cfg.batch_size:
