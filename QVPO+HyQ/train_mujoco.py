@@ -278,9 +278,8 @@ class GaussianDiffusion:
     Reverse  : p_θ(ã_{t-1} | ã_t, s) via EpsilonNet
     """
 
-    def __init__(self, cfg: argparse.Namespace, n_steps: int = 5, beta_min: float = 0.1,
+    def __init__(self, n_steps: int = 5, beta_min: float = 0.1,
                  beta_max: float = 0.5):
-        self.cfg    = cfg
         self.T    = n_steps
         betas     = torch.linspace(beta_min, beta_max, n_steps)
         alphas    = 1.0 - betas
@@ -298,6 +297,7 @@ class GaussianDiffusion:
         self.action_high = None
 
     def to(self, device: torch.device) -> "GaussianDiffusion":
+        global cfg
         for attr in ["betas", "alpha_bar", "alpha_bar_prev",
                      "sqrt_ab", "sqrt_1mab", "posterior_var"]:
             setattr(self, attr, getattr(self, attr).to(device))
