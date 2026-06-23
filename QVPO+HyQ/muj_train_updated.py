@@ -662,7 +662,7 @@ def build_config():
     p = argparse.ArgumentParser()
 
     p.add_argument("--env", type=str, default="Hopper-v4")  # ✅ NEW
-    p.add_argument("--demo_path", default="dataset.npz")
+    p.add_argument("--demo_path", default="hopper_dataset.npz")
 
     p.add_argument("--batch_size", type=int, default=256)
     p.add_argument("--online_capacity", type=int, default=200000)
