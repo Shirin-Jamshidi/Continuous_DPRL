@@ -9,7 +9,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-import gym
+import gymnasium as gym
 
 
 # =============================================================================
@@ -237,7 +237,7 @@ class Trainer:
 
 def build_config():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--env", type=str, default="Hopper-v3")
+    parser.add_argument("--env", type=str, default="Hopper-v4")
     parser.add_argument("--steps", type=int, default=200000)
     parser.add_argument("--batch", type=int, default=256)
     parser.add_argument("--seed", type=int, default=42)
