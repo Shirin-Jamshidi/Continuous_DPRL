@@ -73,7 +73,7 @@ class OfflineBuffer:
         next_states= torch.tensor(raw["next_states"], dtype=torch.float32)
 
         # No 'dones' key — all transitions are mid-episode (reward = 1 always)
-        dones = torch.tensor(raw["terminals"], dtype=torch.float32)
+        dones = torch.tensor(raw["dones"], dtype=torch.float32)
 
         self.states      = states.to(device)
         self.actions     = actions.to(device)
