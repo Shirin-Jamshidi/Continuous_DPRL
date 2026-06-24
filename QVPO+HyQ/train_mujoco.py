@@ -622,7 +622,7 @@ class DiffusionQLTrainer:
             v_s     = q_vals.mean(dim=1, keepdim=True)
             adv     = q_vals - v_s                                   # (B, Nd)
             weights = adv.clamp(min=0.0)
-            probs = weights / (weights.mean() + 1e-6) # added for stability
+            weights = weights / (weights.mean() + 1e-6) # added for stability
 
             # best_idx = adv.argmax(dim=1)                             # (B,)
             # row_idx  = torch.arange(B, device=self.device)
@@ -633,6 +633,10 @@ class DiffusionQLTrainer:
 
             ## probabilities
             ## probs = F.softmax(adv / temperature, dim=1)
+            probs = torch.where(
+            weights > 0,
+            weights / (weights + 1e-8),
+            torch.ones_like(weights) / weights.shape[1])
 
             # sample one action index per state
             sample_idx = torch.multinomial(probs, num_samples=1).squeeze(1)
