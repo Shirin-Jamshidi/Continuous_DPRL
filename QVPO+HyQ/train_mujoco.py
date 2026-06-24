@@ -598,6 +598,9 @@ class DiffusionQLTrainer:
 
         q1_pred = self.q1(s, a).squeeze(-1)
         q2_pred = self.q2(s, a).squeeze(-1)
+        print(q1_pred.mean().item())
+        print(td_target.mean().item())
+
         td_err  = ((td_target - q1_pred + td_target - q2_pred) / 2.0
                    ).detach().cpu().numpy()
         loss = F.mse_loss(q1_pred, td_target) + F.mse_loss(q2_pred, td_target)
@@ -621,11 +624,26 @@ class DiffusionQLTrainer:
             v_s     = q_vals.mean(dim=1, keepdim=True)
             adv     = q_vals - v_s                                   # (B, Nd)
             weights = adv.clamp(min=0.0)
+            probs = weights / (weights.mean() + 1e-6) # added for stability
 
-            best_idx = adv.argmax(dim=1)                             # (B,)
-            row_idx  = torch.arange(B, device=self.device)
-            a_sel    = acts_nd.view(B, cfg.Nd, -1)[row_idx, best_idx]  # (B, A)
-            w_sel    = weights[row_idx, best_idx]                       # (B,)
+            # best_idx = adv.argmax(dim=1)                             # (B,)
+            # row_idx  = torch.arange(B, device=self.device)
+            # a_sel    = acts_nd.view(B, cfg.Nd, -1)[row_idx, best_idx]  # (B, A)
+            # w_sel    = weights[row_idx, best_idx]                       # (B,)
+
+            ## temperature = 1.0
+
+            ## probabilities
+            ## probs = F.softmax(adv / temperature, dim=1)
+
+            # sample one action index per state
+            sample_idx = torch.multinomial(probs, num_samples=1).squeeze(1)
+
+            row_idx = torch.arange(B, device=self.device)
+
+            a_sel = acts_nd.view(B, cfg.Nd, -1)[row_idx, sample_idx]
+            w_sel = probs[row_idx, sample_idx].detach()
+
 
         return self.diffusion.q_weighted_vlo_loss(
             self.eps_net, a_sel, s, w_sel
