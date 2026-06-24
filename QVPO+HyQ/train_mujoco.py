@@ -598,8 +598,6 @@ class DiffusionQLTrainer:
 
         q1_pred = self.q1(s, a).squeeze(-1)
         q2_pred = self.q2(s, a).squeeze(-1)
-        print(q1_pred.mean().item())
-        print(td_target.mean().item())
 
         td_err  = ((td_target - q1_pred + td_target - q2_pred) / 2.0
                    ).detach().cpu().numpy()
