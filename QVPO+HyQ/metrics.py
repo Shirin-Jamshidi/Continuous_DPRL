@@ -300,6 +300,7 @@ def _iqm(arr: np.ndarray) -> float:
 if __name__ == "__main__":
     print_comparison_table([
         "vanilla_diffusion_metrics.npz",
-        "qvpo+hy-q_metrics.npz",
+        "qvpo+hy-q_metrics.npz", # This is on the Continuous_DPRL folder, move it back after running the mujoco training.
         "qvpo_metrics.npz",
+        "hyqvpo_mujoco_metrics.npz",
     ])
