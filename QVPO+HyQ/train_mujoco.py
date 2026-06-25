@@ -621,12 +621,23 @@ class DiffusionQLTrainer:
             v_s     = q_vals.mean(dim=1, keepdim=True)
             adv     = q_vals - v_s                                   # (B, Nd)
             weights = adv.clamp(min=0.0)
-            weights = weights / (weights.mean() + 1e-6) # added
 
             best_idx = adv.argmax(dim=1)                             # (B,)
             row_idx  = torch.arange(B, device=self.device)
             a_sel    = acts_nd.view(B, cfg.Nd, -1)[row_idx, best_idx]  # (B, A)
             w_sel    = weights[row_idx, best_idx]                       # (B,)
+            # weights = adv.clamp(min=0.0) # added
+            # sum_w = weights.sum(dim=1, keepdim=True)
+            # probs = torch.where(
+            #     sum_w > 0,
+            #     weights / (sum_w + 1e-8),
+            #     torch.ones_like(weights) / weights.shape[1]
+            # )
+
+            # sample_idx = torch.multinomial(probs, 1).squeeze(1)
+            # row_idx = torch.arange(B, device=self.device)
+            # a_sel = acts_nd.view(B, cfg.Nd, -1)[row_idx, sample_idx]
+            # w_sel = probs[row_idx, sample_idx].detach()
 
         return self.diffusion.q_weighted_vlo_loss(
             self.eps_net, a_sel, s, w_sel
@@ -831,7 +842,7 @@ class DiffusionQLTrainer:
 # Per-environment recommended hyperparameters
 # (override from CLI as needed; these are solid starting points)
 ENV_DEFAULTS = {
-    "Hopper-v3":      dict(hidden_dim=256, Nd=32, K_b=5,  online_steps=500_000),
+    "Hopper-v3":      dict(hidden_dim=256, Nd=64, K_b=5,  online_steps=500_000),
     "Walker2d-v3":    dict(hidden_dim=256, Nd=32, K_b=5,  online_steps=1_000_000),
     "HalfCheetah-v3": dict(hidden_dim=256, Nd=32, K_b=5,  online_steps=1_000_000),
     "Ant-v3":         dict(hidden_dim=512, Nd=64, K_b=10, online_steps=1_000_000),
@@ -863,7 +874,7 @@ def build_config() -> argparse.Namespace:
                    help="Path to offline .npz dataset for the chosen env")
 
     # Diffusion
-    p.add_argument("--n_diffusion_steps", type=int,   default=5)
+    p.add_argument("--n_diffusion_steps", type=int,   default=20) # 20 in QVPO
     p.add_argument("--beta_min",          type=float, default=0.1)
     p.add_argument("--beta_max",          type=float, default=0.5)
     p.add_argument("--hidden_dim",        type=int,   default=256,
@@ -871,21 +882,21 @@ def build_config() -> argparse.Namespace:
     p.add_argument("--time_emb_dim",      type=int,   default=16)
 
     # QVPO
-    p.add_argument("--Nd",        type=int,   default=32)
-    p.add_argument("--K_b",       type=int,   default=5)
-    p.add_argument("--K_t",       type=int,   default=2)
+    p.add_argument("--Nd",        type=int,   default=32) # 64 in QVPO
+    p.add_argument("--K_b",       type=int,   default=5) # 4 in QVPO
+    p.add_argument("--K_t",       type=int,   default=2) # 4 in QVPO
     p.add_argument("--omega_ent", type=float, default=1.0)
 
     # Critic / RL
     p.add_argument("--gamma",      type=float, default=0.99)
     p.add_argument("--tau",        type=float, default=0.005)
-    p.add_argument("--lr_q",       type=float, default=3e-4)
-    p.add_argument("--lr_policy",  type=float, default=3e-4)
+    p.add_argument("--lr_q",       type=float, default=3e-4) 
+    p.add_argument("--lr_policy",  type=float, default=3e-4) # 0.0001 in QVPO
     p.add_argument("--batch_size", type=int,   default=256)
 
     # Hy-Q
-    p.add_argument("--hyq_beta_end",     type=float, default=0.25)
-    p.add_argument("--hyq_anneal_steps", type=int,   default=50_000)
+    p.add_argument("--hyq_beta_end",     type=float, default=0.5)
+    p.add_argument("--hyq_anneal_steps", type=int,   default=250_000)
     p.add_argument("--hyq_td_alpha",     type=float, default=0.6)
     p.add_argument("--online_capacity",  type=int,   default=1_000_000)
 
