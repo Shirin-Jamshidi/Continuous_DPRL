@@ -842,7 +842,7 @@ class DiffusionQLTrainer:
 # Per-environment recommended hyperparameters
 # (override from CLI as needed; these are solid starting points)
 ENV_DEFAULTS = {
-    "Hopper-v3":      dict(hidden_dim=256, Nd=64, K_b=5,  online_steps=500_000),
+    "Hopper-v3":      dict(hidden_dim=256, Nd=32, K_b=5,  online_steps=500_000),
     "Walker2d-v3":    dict(hidden_dim=256, Nd=32, K_b=5,  online_steps=1_000_000),
     "HalfCheetah-v3": dict(hidden_dim=256, Nd=32, K_b=5,  online_steps=1_000_000),
     "Ant-v3":         dict(hidden_dim=512, Nd=64, K_b=10, online_steps=1_000_000),
@@ -853,7 +853,7 @@ ENV_DEFAULTS = {
     "HalfCheetah-v4": dict(hidden_dim=256, Nd=32, K_b=5,  online_steps=1_000_000),
     "Ant-v4":         dict(hidden_dim=512, Nd=64, K_b=10, online_steps=1_000_000),
     "Humanoid-v4":    dict(hidden_dim=512, Nd=64, K_b=10, online_steps=2_000_000),
-    "Hopper-v5":      dict(hidden_dim=256, Nd=32, K_b=5,  online_steps=500_000),
+    "Hopper-v5":      dict(hidden_dim=256, Nd=64, K_b=5,  online_steps=500_000),
     "Walker2d-v5":    dict(hidden_dim=256, Nd=32, K_b=5,  online_steps=1_000_000),
     "HalfCheetah-v5": dict(hidden_dim=256, Nd=32, K_b=5,  online_steps=1_000_000),
     "Ant-v5":         dict(hidden_dim=512, Nd=64, K_b=10, online_steps=1_000_000),
@@ -874,7 +874,7 @@ def build_config() -> argparse.Namespace:
                    help="Path to offline .npz dataset for the chosen env")
 
     # Diffusion
-    p.add_argument("--n_diffusion_steps", type=int,   default=20) # 20 in QVPO
+    p.add_argument("--n_diffusion_steps", type=int,   default=20) # 20 in QVPO, 5 in this
     p.add_argument("--beta_min",          type=float, default=0.1)
     p.add_argument("--beta_max",          type=float, default=0.5)
     p.add_argument("--hidden_dim",        type=int,   default=256,
@@ -882,9 +882,9 @@ def build_config() -> argparse.Namespace:
     p.add_argument("--time_emb_dim",      type=int,   default=16)
 
     # QVPO
-    p.add_argument("--Nd",        type=int,   default=32) # 64 in QVPO
+    p.add_argument("--Nd",        type=int,   default=64) # 64 in QVPO, it was 32
     p.add_argument("--K_b",       type=int,   default=5) # 4 in QVPO
-    p.add_argument("--K_t",       type=int,   default=4) # 4 in QVPO
+    p.add_argument("--K_t",       type=int,   default=4) # 4 in QVPO, it was 2
     p.add_argument("--omega_ent", type=float, default=1.0)
 
     # Critic / RL
