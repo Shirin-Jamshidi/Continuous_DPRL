@@ -884,7 +884,7 @@ def build_config() -> argparse.Namespace:
     # QVPO
     p.add_argument("--Nd",        type=int,   default=32) # 64 in QVPO
     p.add_argument("--K_b",       type=int,   default=5) # 4 in QVPO
-    p.add_argument("--K_t",       type=int,   default=2) # 4 in QVPO
+    p.add_argument("--K_t",       type=int,   default=4) # 4 in QVPO
     p.add_argument("--omega_ent", type=float, default=1.0)
 
     # Critic / RL
