@@ -744,6 +744,7 @@ class DiffusionQLTrainer:
         state, _ = env.reset(seed=cfg.seed)
         ep_return = 0.0
         ep_count  = 0
+        episode_steps = 0 # added
 
         for step in range(1, cfg.online_steps + 1):
 
@@ -755,12 +756,24 @@ class DiffusionQLTrainer:
             state      = ns
             ep_return += reward
 
-            if done:
-                self.log["episode_return"].append(ep_return)
-                ep_count += 1
-                ep_return = 0.0
-                state, _ = env.reset()
+            # if done:
+            #     self.log["episode_return"].append(ep_return)
+            #     ep_count += 1
+            #     ep_return = 0.0
+            #     state, _ = env.reset()
 
+            # added from here
+            episode_steps += 1
+            if done:
+                ep_count += 1
+                self.log["episode_return"].append(ep_return)
+                print(f'episode: {ep_count:5d} '
+                f'episode steps: {episode_steps:4d} '
+                f'reward: {ep_return:7.1f}')
+                ep_return = 0.0
+                episode_steps = 0
+                state, _ = env.reset()
+            # to here
             # ── Wait for enough online data ───────────────────────────────────
             if self.online_buf.size < cfg.batch_size:
                 continue
@@ -793,21 +806,44 @@ class DiffusionQLTrainer:
 
     # ── Final evaluation ───────────────────────────────────────────────────
 
-    def evaluate(self, env, n_episodes: int = 10) -> float:
+    # def evaluate(self, env, n_episodes: int = 10) -> float:
+    #     returns = []
+    #     for ep in range(n_episodes):
+    #         state, _ = env.reset()
+    #         ep_ret, done = 0.0, False
+    #         while not done:
+    #             action = self.select_action(state)
+    #             state, reward, term, trunc, _ = env.step(action)
+    #             ep_ret += reward
+    #             done = term or trunc
+    #         returns.append(ep_ret)
+    #         print(f"    ep {ep+1:2d}: {ep_ret:.1f}")
+    #     mean_ret = float(np.mean(returns))
+    #     print(f"  → mean={mean_ret:.2f}  std={float(np.std(returns)):.2f}")
+    #     return mean_ret
+
+    def _evaluate(self, step: int):
+
         returns = []
-        for ep in range(n_episodes):
-            state, _ = env.reset()
+        for ep in range(self.cfg.eval_episodes):
+            s, _ = self.eval_env.reset(seed=self.cfg.seed + ep)
             ep_ret, done = 0.0, False
             while not done:
-                action = self.select_action(state)
-                state, reward, term, trunc, _ = env.step(action)
-                ep_ret += reward
+                a = self.select_action(s)
+                s, r, term, trunc, _ = self.eval_env.step(a)
+                ep_ret += r
                 done = term or trunc
-            returns.append(ep_ret)
-            print(f"    ep {ep+1:2d}: {ep_ret:.1f}")
-        mean_ret = float(np.mean(returns))
-        print(f"  → mean={mean_ret:.2f}  std={float(np.std(returns)):.2f}")
-        return mean_ret
+                returns.append(ep_ret)
+                returns = np.array(returns, dtype=np.float32)
+                mean_ret = returns.mean()
+                std_ret = returns.std()
+                print("-" * 60)
+                print(f'Num steps: {step:7d} reward: {mean_ret:7.1f} std: {std_ret:7.1f}')
+                print(returns)
+                print("-" * 60)
+        self.tracker.log_eval(step=step, returns=returns.tolist())
+
+        return float(mean_ret)
 
     # ── Checkpoint ─────────────────────────────────────────────────────────
 
