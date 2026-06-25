@@ -822,7 +822,7 @@ class DiffusionQLTrainer:
     #     print(f"  → mean={mean_ret:.2f}  std={float(np.std(returns)):.2f}")
     #     return mean_ret
 
-    def _evaluate(self, step: int):
+    def evaluate(self, step: int):
 
         returns = []
         for ep in range(self.cfg.eval_episodes):
