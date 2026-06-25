@@ -629,10 +629,7 @@ class DiffusionQLTrainer:
             # a_sel    = acts_nd.view(B, cfg.Nd, -1)[row_idx, best_idx]  # (B, A)
             # w_sel    = weights[row_idx, best_idx]                       # (B,)
 
-            ## temperature = 1.0
-
-            ## probabilities
-            ## probs = F.softmax(adv / temperature, dim=1)
+            # probabilities
             probs = torch.where(
             weights > 0,
             weights / (weights + 1e-8),
