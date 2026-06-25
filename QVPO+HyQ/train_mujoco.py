@@ -833,17 +833,18 @@ class DiffusionQLTrainer:
                 s, r, term, trunc, _ = self.eval_env.step(a)
                 ep_ret += r
                 done = term or trunc
-                returns.append(ep_ret)
-                returns = np.array(returns, dtype=np.float32)
-                mean_ret = returns.mean()
-                std_ret = returns.std()
-                print("-" * 60)
-                print(f'Num steps: {step:7d} reward: {mean_ret:7.1f} std: {std_ret:7.1f}')
-                print(returns)
-                print("-" * 60)
-        self.tracker.log_eval(step=step, returns=returns.tolist())
+            returns.append(ep_ret)
 
-        return float(mean_ret)
+        returns_arr = np.array(returns, dtype=np.float32)
+        mean_ret = float(returns_arr.mean())
+        std_ret = float(returns_arr.std())
+        print("-" * 60)
+        print(f'Num steps: {step:7d} reward: {mean_ret:7.1f} std: {std_ret:7.1f}')
+        print(returns_arr)
+        print("-" * 60)
+        self.tracker.log_eval(step=step, returns=returns_arr.tolist())
+
+        return mean_ret
 
     # ── Checkpoint ─────────────────────────────────────────────────────────
 
