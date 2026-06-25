@@ -986,7 +986,7 @@ def main():
     trainer.save(cfg.save_path.replace(".pt", "_offline.pt"))
 
     print("\n  [Eval] After offline pretraining:")
-    trainer.evaluate(env, n_episodes=5)
+    trainer.evaluate(n_episodes=10)
 
     # Phase 2 — online finetuning
     trainer.online_finetune(env)
