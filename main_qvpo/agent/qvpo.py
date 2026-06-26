@@ -11,6 +11,7 @@ from agent.diffusion import Diffusion
 from agent.vae import VAE
 from agent.helpers import EMA
 from agent.q_transform import *
+from agent.replay_memory import HyQMixer
 import os
 
 
@@ -57,6 +58,7 @@ class QVPO(object):
         self.actor_optimizer = torch.optim.Adam(self.actor.parameters(), lr=args.diffusion_lr, eps=1e-5)
 
         self.memory = memory
+        self.mixer = HyQMixer(memory, diffusion_memory, use_offline=args.use_offline, beta_start=args.hyq_beta_start, beta_end=args.hyq_beta_end, anneal_steps=args.hyq_anneal_steps, td_alpha=args.hyq_td_alpha)
         if not self.aug:
             self.diffusion_memory = diffusion_memory
         self.action_gradient_steps = args.action_gradient_steps
@@ -158,8 +160,8 @@ class QVPO(object):
     def train(self, t, iterations, batch_size=256, log_writer=None):
         for itr in range(iterations):
             # Sample replay buffer / batch
-            states, actions, rewards, next_states, masks = self.memory.sample(batch_size)
-
+            # states, actions, rewards, next_states, masks = self.memory.sample(batch_size)
+            states, actions, rewards, next_states, masks = self.mixer.sample(batch_size)
             """ Q Training """
             current_q1, current_q2 = self.critic(states, actions)
 
@@ -179,7 +181,7 @@ class QVPO(object):
                 # if self.step % 10 == 0:
                 #     log_writer.add_scalar('Critic Grad Norm', critic_grad_norms.max().item(), self.step)
             self.critic_optimizer.step()
-
+            self.mixer.update(states, actions, rewards, next_states, masks, self.critic, self.actor, self.actor_target, self.device) #added
             """ Policy Training """
             if t % self.policy_freq == 0:
                 if self.aug:
