@@ -696,9 +696,10 @@ class DiffusionQLTrainer:
 
         self.tracker.log_eval(step=step, returns=returns)
         avg = float(np.mean(returns))
-        print(f"  [eval  step={step:7d}]  "
+        print(f"  [Num  steps={step:7d}]  "
               f"mean={avg:8.2f}  std={float(np.std(returns)):6.2f}  "
               f"β={self.mixer.beta:.3f}")
+        print(returns)
         return avg
 
     # ── Phase 1: Offline pretraining ──────────────────────────────────────
@@ -774,6 +775,7 @@ class DiffusionQLTrainer:
                 episode_steps = 0
                 state, _ = env.reset()
             # to here
+
             # ── Wait for enough online data ───────────────────────────────────
             if self.online_buf.size < cfg.batch_size:
                 continue
@@ -833,18 +835,17 @@ class DiffusionQLTrainer:
                 s, r, term, trunc, _ = self.eval_env.step(a)
                 ep_ret += r
                 done = term or trunc
-            returns.append(ep_ret)
+                returns.append(ep_ret)
+                returns = float(np.array(returns, dtype=np.float32))
+                mean_ret = float(returns.mean())
+                std_ret = float(returns.std())
+                print("-" * 60)
+                print(f'Num steps: {step:7d} reward: {mean_ret:7.1f} std: {std_ret:7.1f} β={self.mixer.beta:.3f}')
+                print(returns)
+                print("-" * 60)
+        self.tracker.log_eval(step=step, returns=returns.tolist())
 
-        returns_arr = np.array(returns, dtype=np.float32)
-        mean_ret = float(returns_arr.mean())
-        std_ret = float(returns_arr.std())
-        print("-" * 60)
-        print(f'Num steps: {step:7d} reward: {mean_ret:7.1f} std: {std_ret:7.1f}')
-        print(returns_arr)
-        print("-" * 60)
-        self.tracker.log_eval(step=step, returns=returns_arr.tolist())
-
-        return mean_ret
+        return float(mean_ret)
 
     # ── Checkpoint ─────────────────────────────────────────────────────────
 
@@ -932,8 +933,8 @@ def build_config() -> argparse.Namespace:
     p.add_argument("--batch_size", type=int,   default=256)
 
     # Hy-Q
-    p.add_argument("--hyq_beta_end",     type=float, default=0.5)
-    p.add_argument("--hyq_anneal_steps", type=int,   default=250_000)
+    p.add_argument("--hyq_beta_end",     type=float, default=0.25)
+    p.add_argument("--hyq_anneal_steps", type=int,   default=100_000)
     p.add_argument("--hyq_td_alpha",     type=float, default=0.6)
     p.add_argument("--online_capacity",  type=int,   default=1_000_000)
 
