@@ -58,7 +58,7 @@ class QVPO(object):
         self.actor_optimizer = torch.optim.Adam(self.actor.parameters(), lr=args.diffusion_lr, eps=1e-5)
 
         self.memory = memory
-        self.mixer = HyQMixer(memory, memory, beta_start=args.hyq_beta_start, beta_end=args.hyq_beta_end, anneal_steps=args.hyq_anneal_steps, td_alpha=args.hyq_td_alpha)
+        self.mixer = HyQMixer(memory, memory)
         if not self.aug:
             self.diffusion_memory = diffusion_memory
         self.action_gradient_steps = args.action_gradient_steps
