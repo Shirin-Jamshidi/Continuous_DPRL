@@ -115,3 +115,4 @@ class VAE(nn.Module):
         else:
             action_idx = torch.topk(q, k=chosen, dim=1)[1].repeat(1, 1, self.action_dim)
             return old_state.repeat(chosen, 1).view(chosen, raw_batch_size, -1).transpose(0,1).contiguous().view(raw_batch_size*chosen, -1), action.gather(dim=1, index=action_idx).view(raw_batch_size*chosen, -1)
+        
