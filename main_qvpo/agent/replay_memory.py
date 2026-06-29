@@ -303,7 +303,7 @@ class HyQMixer:
             actor_target: target actor network
             device: device to run on
         """
-        if not self.use_offline or self.offline is None or self._offline_idx is None:
+        if self.offline is None or self._offline_idx is None:
             return
         
         # Compute TD error for offline samples
