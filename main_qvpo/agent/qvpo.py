@@ -163,6 +163,18 @@ class QVPO(object):
             # Sample replay buffer / batch
             # states, actions, rewards, next_states, masks = self.memory.sample(batch_size)
             states, actions, rewards, next_states, masks = self.mixer.sample(batch_size)
+
+
+            # --- ADD THIS TEMPORARY DEBUG CODE IN agent/qvpo.py (Line 166) ---
+            print(">>> DEBUG: Type of states batch:", type(states))
+            if isinstance(states, (list, tuple)):
+                print(">>> DEBUG: First element type:", type(states[0]))
+                print(">>> DEBUG: First element value:", states[0])
+            elif hasattr(states, 'shape'):
+                print(">>> DEBUG: States shape:", states.shape)
+            # -----------------------------------------------------------------
+
+            
             """ Q Training """
             current_q1, current_q2 = self.critic(states, actions)
 
