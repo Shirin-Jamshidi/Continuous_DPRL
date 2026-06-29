@@ -13,7 +13,14 @@ def collect(model_path,
 
     env = gym.make(env_name)
 
-    model = SAC.load(model_path)
+    # model = SAC.load(model_path)
+    model = SAC(
+        "MlpPolicy",
+        env,
+        verbose=1,
+    )
+
+    model.learn(1_000_000)
 
     states = []
     actions = []
@@ -63,7 +70,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--model")
+    # parser.add_argument("--model")
     parser.add_argument("--env")
     parser.add_argument("--output")
     parser.add_argument("--episodes", type=int, default=100)
@@ -71,7 +78,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     collect(
-        args.model,
+        # args.model,
         args.env,
         args.output,
         args.episodes
