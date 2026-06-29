@@ -31,6 +31,15 @@ class ReplayMemory():
 
         self.idx = (self.idx + 1) % self.capacity
         self.full = self.full or self.idx == 0
+        
+        # Add this dynamic priority expansion logic right after saving tensors:
+        if hasattr(self, '_priorities'):
+            # Check if the buffer has expanded beyond your current priorities list size
+            current_buffer_size = self.size
+            if len(self._priorities) < current_buffer_size:
+                # Pad the priorities list with max priority (1.0) to match the new size
+                padding_size = current_buffer_size - len(self._priorities)
+                self._priorities = np.append(self._priorities, np.ones(padding_size, dtype=np.float32))
 
     def sample(self, batch_size):
         idxs = np.random.randint(
@@ -198,48 +207,6 @@ class HyQMixer:
     def update_priorities(self, indices: np.ndarray, td_errors: np.ndarray):
         flattened_errors = np.abs(td_errors.flatten())
         self._priorities[indices] = (flattened_errors + 1e-6) ** self.td_alpha
-
-    # def sample(self, batch_size: int):
-    #     """
-    #     Sample a batch mixing offline and online data based on priority weights.
-        
-    #     Returns:
-    #         Tuple of (states, actions, rewards, next_states, masks)
-    #     """
-    #     self._step += 1
-        
-    #     if self.offline is None:
-    #         # Only use online buffer
-    #         return self.online.sample(batch_size)
-        
-    #     n_offline = int(round(self.beta * batch_size))
-    #     n_online  = batch_size - n_offline
-    #     batches = []
-    #     self._offline_idx = None
-
-    #     if n_offline > 0:
-    #         probs = self._priorities / self._priorities.sum()
-    #         # replace=True: O(N) alias method vs O(N log N) for replace=False
-    #         self._offline_idx = np.random.choice(
-    #             self.offline.size, size=n_offline, replace=True, p=probs
-    #         )
-    #         batches.append(self.offline.sample_by_idx(self._offline_idx))
-
-    #     if n_online > 0:
-    #         src = self.online if self.online.size >= n_online else self.offline
-    #         batches.append(src.sample(n_online))
-
-    #     # Concatenate all tensors along batch dimension
-    #     if len(batches) == 1:
-    #         return batches[0]
-        
-    #     states = torch.cat([b[0] for b in batches], dim=0)
-    #     actions = torch.cat([b[1] for b in batches], dim=0)
-    #     rewards = torch.cat([b[2] for b in batches], dim=0)
-    #     next_states = torch.cat([b[3] for b in batches], dim=0)
-    #     masks = torch.cat([b[4] for b in batches], dim=0)
-        
-    #     return states, actions, rewards, next_states, masks
 
     def sample(self, batch_size: int):
         """
