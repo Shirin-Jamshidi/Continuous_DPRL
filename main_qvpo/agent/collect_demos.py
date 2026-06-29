@@ -2,50 +2,55 @@ import argparse
 import gym
 import numpy as np
 import torch
-
 from stable_baselines3 import SAC
 
-def model(env_name):
+def train_agent(env_name):
     env = gym.make(env_name)
-    model = SAC(
+    # Create the agent
+    agent = SAC(
         "MlpPolicy",
         env,
         verbose=1,
     )
+    # Train the agent
+    print(">>> Starting training...")
+    agent.learn(10_000)
+    print(">>> Training complete!")
+    return agent  # MUST return the trained agent object
 
-    model.learn(1_000_000)
-
-def collect( #model_path,
+def collect(agent,
             env_name,
             save_path,
             episodes=100):
 
     env = gym.make(env_name)
-
-    # model = SAC.load(model_path)
-
     states = []
     actions = []
     rewards = []
     next_states = []
     dones = []
 
+    print(f">>> Collecting {episodes} demonstration episodes...")
     for ep in range(episodes):
-
-        s, _ = env.reset()
-
+        # Handle gym return structure variation safely
+        reset_output = env.reset()
+        s = reset_output[0] if isinstance(reset_output, tuple) else reset_output
         done = False
 
         while not done:
-
-            a, _ = model.predict(
+            # Use the passed agent object to predict actions
+            a, _ = agent.predict(
                 s,
                 deterministic=True
             )
 
-            ns, r, term, trunc, _ = env.step(a)
-
-            d = term or trunc
+            # Unpack step returns
+            step_return = env.step(a)
+            if len(step_return) == 5:
+                ns, r, term, trunc, _ = step_return
+                d = term or trunc
+            else:
+                ns, r, d, _ = step_return
 
             states.append(s)
             actions.append(a)
@@ -65,23 +70,22 @@ def collect( #model_path,
         dones=np.asarray(dones, dtype=np.float32)
     )
 
-    print(f"Collected {len(states)} transitions")
+    print(f">>> Successfully collected {len(states)} transitions to {save_path}")
 
 
 if __name__ == "__main__":
-
     parser = argparse.ArgumentParser()
-
-    # parser.add_argument("--model")
     parser.add_argument("--env")
     parser.add_argument("--output")
     parser.add_argument("--episodes", type=int, default=100)
-
     args = parser.parse_args()
     
-    model(args.env)
+    # 1. Train and get back the trained agent object
+    trained_agent = train_agent(args.env)
+    
+    # 2. Pass that trained agent into collection
     collect(
-        model,
+        trained_agent,
         args.env,
         args.output,
         args.episodes
