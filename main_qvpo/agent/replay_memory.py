@@ -180,7 +180,7 @@ class HyQMixer:
         anneal_steps: int   = 50_000,
         td_alpha:     float = 0.6,
     ):
-        self.offline      = offline_buf
+        self.offline      = online_buf
         self.online       = online_buf
         self.beta_start   = beta_start
         self.beta_end     = beta_end
