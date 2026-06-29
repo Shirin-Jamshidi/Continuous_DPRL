@@ -6,7 +6,7 @@ import torch
 from stable_baselines3 import SAC
 
 
-def collect(model_path,
+def collect( #model_path,
             env_name,
             save_path,
             episodes=100):
