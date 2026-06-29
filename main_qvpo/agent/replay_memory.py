@@ -216,6 +216,15 @@ class HyQMixer:
         n_offline = int(round(self.beta * batch_size))
         n_online  = batch_size - n_offline
         
+
+        if len(self._priorities) != self.offline.size:
+            # resize priorities safely
+            new_size = self.offline.size
+            old = self._priorities
+
+            self._priorities = np.ones(new_size, dtype=np.float32)
+            self._priorities[:min(len(old), new_size)] = old[:min(len(old), new_size)]
+
         # 2. Sample from Offline Buffer
         if n_offline > 0:
             probs = self._priorities / self._priorities.sum()
