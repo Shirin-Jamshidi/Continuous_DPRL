@@ -31,15 +31,6 @@ class ReplayMemory():
 
         self.idx = (self.idx + 1) % self.capacity
         self.full = self.full or self.idx == 0
-        
-        # Add this dynamic priority expansion logic right after saving tensors:
-        if hasattr(self, '_priorities'):
-            # Check if the buffer has expanded beyond your current priorities list size
-            current_buffer_size = self.size
-            if len(self._priorities) < current_buffer_size:
-                # Pad the priorities list with max priority (1.0) to match the new size
-                padding_size = current_buffer_size - len(self._priorities)
-                self._priorities = np.append(self._priorities, np.ones(padding_size, dtype=np.float32))
 
     def sample(self, batch_size):
         idxs = np.random.randint(
@@ -182,7 +173,7 @@ class HyQMixer:
 
     def __init__(
         self,
-        offline_buf, #: OfflineBuffer,
+        offline_buf: OfflineBuffer,
         online_buf,
         beta_start:   float = 1.0,
         beta_end:     float = 0.25,
