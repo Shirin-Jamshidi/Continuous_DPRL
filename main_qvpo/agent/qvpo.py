@@ -206,15 +206,15 @@ class QVPO(object):
                     # q.clamp_(-self.q_neg).add_(self.q_neg)
                     q = eval(self.q_transform)(q, q_neg=self.q_neg, cut=self.cut, running_q_std=self.running_q_std, beta=self.beta,
                                                running_q_mean=self.running_q_mean, v=v, batch_size=batch_size, chosen=self.chosen)
-                    # if self.entropy_alpha > 0.0:
-                    #     rand_states = states.unsqueeze(0).expand(10, -1, -1).contiguous().view(batch_size*self.chosen*10, -1)
-                    #     rand_policy_actions = torch.empty(batch_size * self.chosen * 10, actions.shape[-1], device=self.device).uniform_(
-                    #         -1, 1)
-                    #     rand_q = q.unsqueeze(0).expand(10, -1, -1).contiguous().view(batch_size*self.chosen*10, -1) * self.entropy_alpha
+                    if self.entropy_alpha > 0.0:
+                        rand_states = states.unsqueeze(0).expand(10, -1, -1).contiguous().view(batch_size*self.chosen*10, -1)
+                        rand_policy_actions = torch.empty(batch_size * self.chosen * 10, actions.shape[-1], device=self.device).uniform_(
+                            -1, 1)
+                        rand_q = q.unsqueeze(0).expand(10, -1, -1).contiguous().view(batch_size*self.chosen*10, -1) * self.entropy_alpha
 
-                    #     best_actions = torch.cat([best_actions, rand_policy_actions], dim=0)
-                    #     states = torch.cat([states, rand_states], dim=0)
-                    #     q = torch.cat([q, rand_q], dim=0)
+                        best_actions = torch.cat([best_actions, rand_policy_actions], dim=0)
+                        states = torch.cat([states, rand_states], dim=0)
+                        q = torch.cat([q, rand_q], dim=0)
 
                     actor_loss = self.actor.loss(best_actions, states, weights=q)
                 else:
