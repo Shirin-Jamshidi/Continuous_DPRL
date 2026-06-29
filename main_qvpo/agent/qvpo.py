@@ -59,7 +59,7 @@ class QVPO(object):
 
         self.memory = memory
         offline_buffer = OfflineBuffer("hopper_demo.npz", device=device)
-        self.mixer = HyQMixer(memory, memory)
+        self.mixer = HyQMixer(offline_buf=None, online_buf=memory)
         if not self.aug:
             self.diffusion_memory = diffusion_memory
         self.action_gradient_steps = args.action_gradient_steps
