@@ -5,6 +5,15 @@ import torch
 
 from stable_baselines3 import SAC
 
+def model(env_name):
+    env = gym.make(env_name)
+    model = SAC(
+        "MlpPolicy",
+        env,
+        verbose=1,
+    )
+
+    model.learn(1_000_000)
 
 def collect( #model_path,
             env_name,
@@ -14,13 +23,6 @@ def collect( #model_path,
     env = gym.make(env_name)
 
     # model = SAC.load(model_path)
-    model = SAC(
-        "MlpPolicy",
-        env,
-        verbose=1,
-    )
-
-    model.learn(1_000_000)
 
     states = []
     actions = []
@@ -76,9 +78,10 @@ if __name__ == "__main__":
     parser.add_argument("--episodes", type=int, default=100)
 
     args = parser.parse_args()
-
+    
+    model(args.env)
     collect(
-        # args.model,
+        model,
         args.env,
         args.output,
         args.episodes
