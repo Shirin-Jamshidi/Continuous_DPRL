@@ -309,7 +309,7 @@ class HyQMixer:
         # Compute TD error for offline samples
         with torch.no_grad():
             # Get target Q-values
-            next_actions = actor_target(next_states, eval=False)
+            next_actions = actor_target(next_states, eval=False, q_func=critic)
             target_q1, target_q2 = critic(next_states, next_actions)
             target_q = torch.min(target_q1, target_q2)
             target_q = rewards + masks * target_q
