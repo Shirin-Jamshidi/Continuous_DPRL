@@ -240,7 +240,7 @@ class HyQMixer:
         
     #     return states, actions, rewards, next_states, masks
 
-        def sample(self, batch_size: int):
+    def sample(self, batch_size: int):
         """
         Sample a batch mixing offline and online data based on priority weights.
         
