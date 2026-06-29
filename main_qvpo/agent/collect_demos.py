@@ -14,7 +14,7 @@ def train_agent(env_name):
     )
     # Train the agent
     print(">>> Starting training...")
-    agent.learn(10_000)
+    agent.learn(100)
     print(">>> Training complete!")
     return agent  # MUST return the trained agent object
 
