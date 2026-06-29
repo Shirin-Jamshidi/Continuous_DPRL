@@ -198,7 +198,49 @@ class HyQMixer:
     def update_priorities(self, indices: np.ndarray, td_errors: np.ndarray):
         self._priorities[indices] = (np.abs(td_errors) + 1e-6) ** self.td_alpha
 
-    def sample(self, batch_size: int):
+    # def sample(self, batch_size: int):
+    #     """
+    #     Sample a batch mixing offline and online data based on priority weights.
+        
+    #     Returns:
+    #         Tuple of (states, actions, rewards, next_states, masks)
+    #     """
+    #     self._step += 1
+        
+    #     if self.offline is None:
+    #         # Only use online buffer
+    #         return self.online.sample(batch_size)
+        
+    #     n_offline = int(round(self.beta * batch_size))
+    #     n_online  = batch_size - n_offline
+    #     batches = []
+    #     self._offline_idx = None
+
+    #     if n_offline > 0:
+    #         probs = self._priorities / self._priorities.sum()
+    #         # replace=True: O(N) alias method vs O(N log N) for replace=False
+    #         self._offline_idx = np.random.choice(
+    #             self.offline.size, size=n_offline, replace=True, p=probs
+    #         )
+    #         batches.append(self.offline.sample_by_idx(self._offline_idx))
+
+    #     if n_online > 0:
+    #         src = self.online if self.online.size >= n_online else self.offline
+    #         batches.append(src.sample(n_online))
+
+    #     # Concatenate all tensors along batch dimension
+    #     if len(batches) == 1:
+    #         return batches[0]
+        
+    #     states = torch.cat([b[0] for b in batches], dim=0)
+    #     actions = torch.cat([b[1] for b in batches], dim=0)
+    #     rewards = torch.cat([b[2] for b in batches], dim=0)
+    #     next_states = torch.cat([b[3] for b in batches], dim=0)
+    #     masks = torch.cat([b[4] for b in batches], dim=0)
+        
+    #     return states, actions, rewards, next_states, masks
+
+        def sample(self, batch_size: int):
         """
         Sample a batch mixing offline and online data based on priority weights.
         
@@ -207,38 +249,48 @@ class HyQMixer:
         """
         self._step += 1
         
+        # 1. Handle Online-Only Sampling
         if self.offline is None:
-            # Only use online buffer
             return self.online.sample(batch_size)
         
         n_offline = int(round(self.beta * batch_size))
         n_online  = batch_size - n_offline
-        batches = []
-        self._offline_idx = None
-
+        
+        # 2. Sample from Offline Buffer
         if n_offline > 0:
             probs = self._priorities / self._priorities.sum()
-            # replace=True: O(N) alias method vs O(N log N) for replace=False
-            self._offline_idx = np.random.choice(
-                self.offline.size, size=n_offline, replace=True, p=probs
-            )
-            batches.append(self.offline.sample_by_idx(self._offline_idx))
-
+            # Draw indices based on priorities
+            idx = np.random.choice(self.offline.size, size=n_offline, replace=True, p=probs)
+            self._offline_idx = idx  # Keep track for updates
+            
+            off_data = _offline_sample_by_idx(self.offline, idx)
+        
+        # 3. Sample from Online Buffer
         if n_online > 0:
-            src = self.online if self.online.size >= n_online else self.offline
-            batches.append(src.sample(n_online))
+            # Assumes online buffer returns a tuple: (s, a, r, ns, m)
+            on_s, on_a, on_r, on_ns, on_m = self.online.sample(n_online)
 
-        # Concatenate all tensors along batch dimension
-        if len(batches) == 1:
-            return batches[0]
-        
-        states = torch.cat([b[0] for b in batches], dim=0)
-        actions = torch.cat([b[1] for b in batches], dim=0)
-        rewards = torch.cat([b[2] for b in batches], dim=0)
-        next_states = torch.cat([b[3] for b in batches], dim=0)
-        masks = torch.cat([b[4] for b in batches], dim=0)
-        
-        return states, actions, rewards, next_states, masks
+        # 4. Merge Data or Return pure subsets
+        if n_online == 0:
+            # Pure offline data tuple unpack from dictionary
+            return (
+                off_data["states"], 
+                off_data["actions"], 
+                off_data["rewards"], 
+                off_data["next_states"], 
+                off_data["dones"] # masks map to dones in OfflineBuffer
+            )
+        elif n_offline == 0:
+            return on_s, on_a, on_r, on_ns, on_m
+        else:
+            # Combine tensors from both buffers
+            states = torch.cat([off_data["states"], on_s], dim=0)
+            actions = torch.cat([off_data["actions"], on_a], dim=0)
+            rewards = torch.cat([off_data["rewards"], on_r], dim=0)
+            next_states = torch.cat([off_data["next_states"], on_ns], dim=0)
+            masks = torch.cat([off_data["dones"], on_m], dim=0)
+            return states, actions, rewards, next_states, masks
+
 
     def update(self, states, actions, rewards, next_states, masks, critic, actor, actor_target, device):
         """
