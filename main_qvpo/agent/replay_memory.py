@@ -162,7 +162,6 @@ class HyQMixer:
         self,
         offline_buf: OfflineBuffer,
         online_buf,
-        use_offline:  bool = True,
         beta_start:   float = 1.0,
         beta_end:     float = 0.25,
         anneal_steps: int   = 50_000,
@@ -195,7 +194,7 @@ class HyQMixer:
         """
         self._step += 1
         
-        if not self.use_offline or self.offline is None:
+        if self.offline is None:
             # Only use online buffer
             return self.online.sample(batch_size)
         
