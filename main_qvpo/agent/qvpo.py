@@ -11,7 +11,7 @@ from agent.diffusion import Diffusion
 from agent.vae import VAE
 from agent.helpers import EMA
 from agent.q_transform import *
-from agent.replay_memory import HyQMixer
+from agent.replay_memory import HyQMixer, OfflineBuffer
 import os
 
 
@@ -58,7 +58,8 @@ class QVPO(object):
         self.actor_optimizer = torch.optim.Adam(self.actor.parameters(), lr=args.diffusion_lr, eps=1e-5)
 
         self.memory = memory
-        self.mixer = HyQMixer(memory, memory)
+        offline_buffer = OfflineBuffer("hopper_demos.npz", device=device)
+        self.mixer = HyQMixer(offline_buffer, memory)
         if not self.aug:
             self.diffusion_memory = diffusion_memory
         self.action_gradient_steps = args.action_gradient_steps

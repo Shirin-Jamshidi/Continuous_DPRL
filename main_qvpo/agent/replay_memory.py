@@ -96,6 +96,57 @@ class DiffusionMemory():
         np.copyto(self.best_actions[idxs], best_actions)
 
 
+class OfflineBuffer:
+    """
+    Static offline dataset — stays on CPU with pinned memory.
+
+    For large MuJoCo datasets (up to 1M × 376 for Humanoid) keeping the
+    buffer on GPU wastes VRAM.  Batches are moved to device inside sample()
+    using non_blocking=True so the copy overlaps with GPU compute.
+
+    Expects an .npz file with keys:
+        states, actions, rewards, next_states, dones
+    All shapes: (N, dim) for states/actions/next_states, (N,) or (N,1) for
+    rewards and dones — both are normalised to (N, 1) at load time.
+    """
+
+    def __init__(self, path: str, device: torch.device):
+        raw = np.load(path)
+
+        self.device = device
+
+        # Load everything to CPU, pin for fast async GPU transfer
+        def _t(key, dtype=torch.float32):
+            return torch.tensor(raw[key], dtype=dtype).pin_memory()
+
+        self.states      = _t("states")
+        self.actions     = _t("actions")
+        self.next_states = _t("next_states")
+
+        # Normalise rewards / dones to (N, 1)
+        r = torch.tensor(raw["rewards"], dtype=torch.float32)
+        d = torch.tensor(raw["dones"],   dtype=torch.float32)
+        self.rewards = r.view(-1, 1).pin_memory()
+        self.dones   = d.view(-1, 1).pin_memory()
+
+        self.size = len(self.states)
+        print(f"[OfflineBuffer] {self.size:,} transitions | "
+              f"state={tuple(self.states.shape[1:])}  "
+              f"action={tuple(self.actions.shape[1:])}")
+
+    def sample(self, batch_size: int) -> dict:
+        idx = torch.randint(0, self.size, (batch_size,))
+        # non_blocking so GPU can overlap compute with this transfer
+        to = lambda t: t[idx].to(self.device, non_blocking=True)
+        return {
+            "states":      to(self.states),
+            "actions":     to(self.actions),
+            "rewards":     to(self.rewards),
+            "next_states": to(self.next_states),
+            "dones":       to(self.dones),
+        }
+
+
 class HyQMixer:
     """
     Hy-Q priority-weighted offline/online batch mixer.
@@ -109,17 +160,16 @@ class HyQMixer:
 
     def __init__(
         self,
-        offline_buf,
+        offline_buf: OfflineBuffer,
         online_buf,
-        use_offline:  bool = False,
+        use_offline:  bool = True,
         beta_start:   float = 1.0,
         beta_end:     float = 0.25,
         anneal_steps: int   = 50_000,
         td_alpha:     float = 0.6,
     ):
-        self.offline      = online_buf
+        self.offline      = offline_buf
         self.online       = online_buf
-        self.use_offline  = use_offline
         self.beta_start   = beta_start
         self.beta_end     = beta_end
         self.anneal_steps = anneal_steps
@@ -210,4 +260,3 @@ class HyQMixer:
         
         # Update priorities
         self.update_priorities(self._offline_idx, td_errors)
-    
