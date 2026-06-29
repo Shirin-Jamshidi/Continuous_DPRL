@@ -21,7 +21,7 @@ def train_agent(env_name):
 def collect(agent,
             env_name,
             save_path,
-            episodes=100):
+            episodes=10):
 
     env = gym.make(env_name)
     states = []
