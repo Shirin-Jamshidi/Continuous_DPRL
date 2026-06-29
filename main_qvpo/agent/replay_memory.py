@@ -196,7 +196,8 @@ class HyQMixer:
         return self.beta_start + frac * (self.beta_end - self.beta_start)
 
     def update_priorities(self, indices: np.ndarray, td_errors: np.ndarray):
-        self._priorities[indices] = (np.abs(td_errors) + 1e-6) ** self.td_alpha
+        flattened_errors = np.abs(td_errors.flatten())
+        self._priorities[indices] = (flattened_errors + 1e-6) ** self.td_alpha
 
     # def sample(self, batch_size: int):
     #     """
