@@ -145,20 +145,51 @@ class OfflineBuffer:
             "masks": 1.0 - to(self.dones),
         }
 
-def _offline_sample_by_idx(buf: OfflineBuffer, idx: np.ndarray) -> dict:
-    """Sample specific rows from the CPU offline buffer by numpy index array."""
-    t = torch.from_numpy(idx).long()
-    to = lambda x: x[t].to(buf.device, non_blocking=True)
-    return {
-        "states":      to(buf.states),
-        "actions":     to(buf.actions),
-        "rewards":     to(buf.rewards),
-        "next_states": to(buf.next_states),
-        "dones":       to(buf.dones),
-    }
+def sample_by_idx_unified(buf, idx):
+    """
+    Unified sampling by index that works for BOTH:
+    - OfflineBuffer (torch tensors)
+    - ReplayMemory (numpy arrays)
+    """
+
+    # Convert idx → torch index for tensor case
+    if isinstance(idx, np.ndarray):
+        idx_torch = torch.from_numpy(idx).long()
+    else:
+        idx_torch = idx.long()
+
+    # ---------- Case 1: OfflineBuffer (torch storage) ----------
+    if isinstance(buf.states, torch.Tensor):
+        to = lambda x: x[idx_torch].to(buf.device, non_blocking=True)
+
+        return {
+            "states":      to(buf.states),
+            "actions":     to(buf.actions),
+            "rewards":     to(buf.rewards),
+            "next_states": to(buf.next_states),
+            "masks":       1.0 - to(buf.dones) if hasattr(buf, "dones") else to(buf.masks),
+        }
+
+    # ---------- Case 2: ReplayMemory (numpy storage) ----------
+    else:
+        idx_np = idx if isinstance(idx, np.ndarray) else idx.cpu().numpy()
+
+        states = torch.as_tensor(buf.states[idx_np], device=buf.device)
+        actions = torch.as_tensor(buf.actions[idx_np], device=buf.device)
+        rewards = torch.as_tensor(buf.rewards[idx_np], device=buf.device)
+        next_states = torch.as_tensor(buf.next_states[idx_np], device=buf.device)
+        masks = torch.as_tensor(buf.masks[idx_np], device=buf.device)
+
+        return {
+            "states": states,
+            "actions": actions,
+            "rewards": rewards,
+            "next_states": next_states,
+            "masks": masks,
+        }
 
 # Attach as method at module load
-OfflineBuffer.sample_by_idx = _offline_sample_by_idx
+OfflineBuffer.sample_by_idx = sample_by_idx_unified
 
 class HyQMixer:
     """
@@ -232,7 +263,7 @@ class HyQMixer:
             idx = np.random.choice(self.offline.size, size=n_offline, replace=True, p=probs)
             self._offline_idx = idx  # Keep track for updates
             
-            off_data = _offline_sample_by_idx(self.offline, idx)
+            off_data = self.offline.sample_by_idx(idx)
         
         # 3. Sample from Online Buffer
         if n_online > 0:
