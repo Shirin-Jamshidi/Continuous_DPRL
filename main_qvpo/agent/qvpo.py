@@ -58,7 +58,7 @@ class QVPO(object):
         self.actor_optimizer = torch.optim.Adam(self.actor.parameters(), lr=args.diffusion_lr, eps=1e-5)
 
         self.memory = memory
-        offline_buffer = OfflineBuffer("hopper_demos.npz", device=device)
+        offline_buffer = OfflineBuffer("hopper_demo.npz", device=device)
         self.mixer = HyQMixer(offline_buffer, memory)
         if not self.aug:
             self.diffusion_memory = diffusion_memory
