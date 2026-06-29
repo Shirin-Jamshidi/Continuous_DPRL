@@ -142,7 +142,7 @@ class OfflineBuffer:
             "actions":     to(self.actions),
             "rewards":     to(self.rewards),
             "next_states": to(self.next_states),
-            "dones":       to(self.dones),
+            "masks": 1.0 - to(self.dones),
         }
 
 def _offline_sample_by_idx(buf: OfflineBuffer, idx: np.ndarray) -> dict:
@@ -189,6 +189,7 @@ class HyQMixer:
         self._step        = 0
         self._priorities  = np.ones(offline_buf.size, dtype=np.float32) if offline_buf is not None else np.ones(1, dtype=np.float32)
         self.device       = None
+        self._offline_idx = None
 
     @property
     def beta(self) -> float:
