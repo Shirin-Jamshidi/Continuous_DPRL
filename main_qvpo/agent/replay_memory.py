@@ -288,7 +288,7 @@ class HyQMixer:
                 off_data["actions"], 
                 off_data["rewards"], 
                 off_data["next_states"], 
-                off_data["dones"] # masks map to dones in OfflineBuffer
+                off_data["masks"]
             )
         elif n_offline == 0:
             return on_s, on_a, on_r, on_ns, on_m
@@ -298,7 +298,7 @@ class HyQMixer:
             actions = torch.cat([off_data["actions"], on_a], dim=0)
             rewards = torch.cat([off_data["rewards"], on_r], dim=0)
             next_states = torch.cat([off_data["next_states"], on_ns], dim=0)
-            masks = torch.cat([off_data["dones"], on_m], dim=0)
+            masks = torch.cat([off_data["masks"], on_m], dim=0)
             return states, actions, rewards, next_states, masks
 
 
