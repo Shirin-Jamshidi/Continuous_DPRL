@@ -95,7 +95,6 @@ class DiffusionMemory():
     def replace(self, idxs, best_actions):
         np.copyto(self.best_actions[idxs], best_actions)
 
-
 class OfflineBuffer:
     """
     Static offline dataset — stays on CPU with pinned memory.
@@ -146,6 +145,20 @@ class OfflineBuffer:
             "dones":       to(self.dones),
         }
 
+def _offline_sample_by_idx(buf: OfflineBuffer, idx: np.ndarray) -> dict:
+    """Sample specific rows from the CPU offline buffer by numpy index array."""
+    t = torch.from_numpy(idx).long()
+    to = lambda x: x[t].to(buf.device, non_blocking=True)
+    return {
+        "states":      to(buf.states),
+        "actions":     to(buf.actions),
+        "rewards":     to(buf.rewards),
+        "next_states": to(buf.next_states),
+        "dones":       to(buf.dones),
+    }
+
+# Attach as method at module load
+OfflineBuffer.sample_by_idx = _offline_sample_by_idx
 
 class HyQMixer:
     """
