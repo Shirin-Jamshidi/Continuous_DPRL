@@ -264,7 +264,17 @@ class HyQMixer:
             self._offline_idx = idx  # Keep track for updates
             
             off_data = self.offline.sample_by_idx(idx)
-        
+
+            # Normalize to dict if tuple
+            if isinstance(off_data, tuple):
+                off_data = {
+                    "states": off_data[0],
+                    "actions": off_data[1],
+                    "rewards": off_data[2],
+                    "next_states": off_data[3],
+                    "masks": off_data[4],
+                }
+
         # 3. Sample from Online Buffer
         if n_online > 0:
             # Assumes online buffer returns a tuple: (s, a, r, ns, m)
