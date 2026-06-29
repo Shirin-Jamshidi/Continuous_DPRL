@@ -173,7 +173,7 @@ class HyQMixer:
 
     def __init__(
         self,
-        offline_buf: OfflineBuffer,
+        offline_buf, #: OfflineBuffer,
         online_buf,
         beta_start:   float = 1.0,
         beta_end:     float = 0.25,
