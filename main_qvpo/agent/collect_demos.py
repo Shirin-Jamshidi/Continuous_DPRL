@@ -1,4 +1,5 @@
 import argparse
+import os
 import gym
 import numpy as np
 import torch
@@ -73,6 +74,18 @@ def collect(agent,
     print(f">>> Successfully collected {len(states)} transitions to {save_path}")
 
 
+def save_model(agent, save_path):
+    base_dir = os.path.dirname(save_path)
+    base_name = os.path.splitext(os.path.basename(save_path))[0]
+    model_path = os.path.join(base_dir, f"{base_name}_sac")
+
+    if base_dir:
+        os.makedirs(base_dir, exist_ok=True)
+
+    agent.save(model_path)
+    print(f">>> Successfully saved learned model to {model_path}.zip")
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--env")
@@ -90,5 +103,7 @@ if __name__ == "__main__":
         args.output,
         args.episodes
     )
+
+    save_model(trained_agent, args.output)
 
 # python agent/collect_demos.py --env Hopper-v3 --output agent/hopper_demo.npz --episodes 100
