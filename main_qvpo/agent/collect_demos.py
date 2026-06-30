@@ -14,14 +14,14 @@ def train_agent(env_name):
     )
     # Train the agent
     print(">>> Starting training...")
-    agent.learn(100)
+    agent.learn(10000)
     print(">>> Training complete!")
     return agent  # MUST return the trained agent object
 
 def collect(agent,
             env_name,
             save_path,
-            episodes=10):
+            episodes=100):
 
     env = gym.make(env_name)
     states = []
@@ -90,3 +90,5 @@ if __name__ == "__main__":
         args.output,
         args.episodes
     )
+
+# python agent/collect_demos.py --env Hopper-v3 --output agent/hopper_demo.npz --episodes 100
