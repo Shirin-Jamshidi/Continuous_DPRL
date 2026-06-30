@@ -211,7 +211,7 @@ class HyQMixer:
         anneal_steps: int   = 50_000,
         td_alpha:     float = 0.6,
     ):
-        self.offline      = online_buf
+        self.offline      = offline_buf
         self.online       = online_buf
         self.beta_start   = beta_start
         self.beta_end     = beta_end
@@ -247,7 +247,6 @@ class HyQMixer:
         n_offline = int(round(self.beta * batch_size))
         n_online  = batch_size - n_offline
         
-
         if len(self._priorities) != self.offline.size:
             # resize priorities safely
             new_size = self.offline.size
@@ -300,7 +299,6 @@ class HyQMixer:
             next_states = torch.cat([off_data["next_states"], on_ns], dim=0)
             masks = torch.cat([off_data["masks"], on_m], dim=0)
             return states, actions, rewards, next_states, masks
-
 
     def update(self, states, actions, rewards, next_states, masks, critic, actor, actor_target, device):
         """
