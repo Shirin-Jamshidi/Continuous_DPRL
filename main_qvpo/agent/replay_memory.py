@@ -323,7 +323,7 @@ class PriorityMixer:
         states, actions, rewards, next_states, masks = self.mixer.sample(batch_size)
         ...
         self.mixer.update(states, actions, rewards, next_states, masks,
-                           self.critic, self.actor, self.actor_target, self.device)
+                           self.critic, self.critic_target, self.actor_target, self.device)
     """
 
     def __init__(
@@ -395,14 +395,14 @@ class PriorityMixer:
 
         return self.online.sample_by_idx(idxs)
 
-    def update(self, states, actions, rewards, next_states, masks, critic, actor, actor_target, device):
+    def update(self, states, actions, rewards, next_states, masks, critic, critic_target, actor_target, device):
         """
         Compute TD errors for the last-sampled batch and update priorities.
 
         Args:
             states, actions, rewards, next_states, masks: batch tensors from sample()
             critic: current critic network
-            actor: current actor network (unused, kept for signature parity)
+            critic_target: target critic network used to score next actions
             actor_target: target actor network
             device: device to run on (unused, kept for signature parity)
         """
@@ -410,8 +410,8 @@ class PriorityMixer:
             return
 
         with torch.no_grad():
-            next_actions = actor_target(next_states, eval=False)
-            target_q1, target_q2 = critic(next_states, next_actions)
+            next_actions = actor_target(next_states, eval=False, q_func=critic_target)
+            target_q1, target_q2 = critic_target(next_states, next_actions)
             target_q = torch.min(target_q1, target_q2)
             target_q = rewards + masks * target_q
 

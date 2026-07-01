@@ -183,7 +183,7 @@ class QVPO(object):
                 # if self.step % 10 == 0:
                 #     log_writer.add_scalar('Critic Grad Norm', critic_grad_norms.max().item(), self.step)
             self.critic_optimizer.step()
-            self.mixer.update(states, actions, rewards, next_states, masks, self.critic, self.actor, self.actor_target, self.device) #added
+            self.mixer.update(states, actions, rewards, next_states, masks, self.critic, self.critic_target, self.actor_target, self.device) #added
             """ Policy Training """
             if t % self.policy_freq == 0:
                 if self.aug:
