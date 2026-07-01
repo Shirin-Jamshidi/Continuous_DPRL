@@ -11,7 +11,7 @@ from agent.diffusion import Diffusion
 from agent.vae import VAE
 from agent.helpers import EMA
 from agent.q_transform import *
-from agent.replay_memory import HyQMixer
+from agent.replay_memory import PriorityMixer
 import os
 
 
@@ -58,7 +58,8 @@ class QVPO(object):
         self.actor_optimizer = torch.optim.Adam(self.actor.parameters(), lr=args.diffusion_lr, eps=1e-5)
 
         self.memory = memory
-        self.mixer = HyQMixer(memory, memory)
+        # offline_buffer = OfflineBuffer("hopper_demo.npz", device=device)
+        self.mixer = PriorityMixer(online_buf=memory)
         if not self.aug:
             self.diffusion_memory = diffusion_memory
         self.action_gradient_steps = args.action_gradient_steps
@@ -162,6 +163,7 @@ class QVPO(object):
             # Sample replay buffer / batch
             # states, actions, rewards, next_states, masks = self.memory.sample(batch_size)
             states, actions, rewards, next_states, masks = self.mixer.sample(batch_size)
+
             """ Q Training """
             current_q1, current_q2 = self.critic(states, actions)
 
@@ -215,12 +217,7 @@ class QVPO(object):
                         best_actions = torch.cat([best_actions, rand_policy_actions], dim=0)
                         states = torch.cat([states, rand_states], dim=0)
                         q = torch.cat([q, rand_q], dim=0)
-                    # q[q<1.0] = 1.0
-                    # q = torch.clip(q / self.running_avg_qnorm, -6 ,6)
-                    # expq = torch.exp(self.beta * q)
-                    # expq[expq<=expq.quantile(0.95)] = 0.0
-                    # if itr % 10000 == 0 : print(expq, itr)
-                    # print("expq", expq.shape)
+
                     actor_loss = self.actor.loss(best_actions, states, weights=q)
                 else:
                     actor_loss = self.actor.loss(best_actions, states)
@@ -318,3 +315,4 @@ class QVPO(object):
         states = states.unsqueeze(1).repeat(1, rep, 1).view(rep*state_shape, -1)
         q1, q2 = self.critic(states, actions)
         return q1.view(state_shape, rep, 1), q2.view(state_shape, rep, 1)
+
